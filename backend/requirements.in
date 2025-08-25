@@ -1,0 +1,14 @@
+fastapi==0.111.0
+uvicorn==0.24.0
+python-dotenv==1.0.1
+psycopg2
+sqlalchemy
+pydantic
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+google-cloud-pubsub
+pip-tools
+
+
