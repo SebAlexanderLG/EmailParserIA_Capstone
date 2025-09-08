@@ -10,5 +10,6 @@ google-auth-httplib2
 google-api-python-client
 google-cloud-pubsub
 pip-tools
+requests
 
 

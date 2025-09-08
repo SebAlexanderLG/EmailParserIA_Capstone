@@ -178,6 +178,7 @@ pyyaml==6.0.2
     # via uvicorn
 requests==2.32.3
     # via
+    #   -r requirements.in
     #   google-api-core
     #   requests-oauthlib
 requests-oauthlib==2.0.0
