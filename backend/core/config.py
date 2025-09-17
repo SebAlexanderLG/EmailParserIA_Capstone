@@ -6,4 +6,4 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
     "https://www.googleapis.com/auth/gmail.send",
 ]
-CLIENT_SECRETS_FILE = "clients.json"
+CLIENT_SECRETS_FILE = "credentials.json"

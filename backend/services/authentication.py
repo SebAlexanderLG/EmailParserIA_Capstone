@@ -1,7 +1,6 @@
 import google_auth_oauthlib.flow
 import json
 from core.config import SCOPES, CLIENT_SECRETS_FILE
-from fastapi.responses import RedirectResponse
 
 
 def auth_load() -> dict:
@@ -10,11 +9,16 @@ def auth_load() -> dict:
         return json.load(f)
 
 
-def autorizacion_gmail() -> RedirectResponse:
-    """Función para iniciar la autenticación con Gmail"""
+def autorizacion_gmail() -> str:
     flow = google_auth_oauthlib.flow.Flow.from_client_config(auth_load(), scopes=SCOPES)
+    # Cambiar URI de redirección a localhost para desarrollo local
     flow.redirect_uri = "http://localhost:8000/auth/callback"
-    authorization_url = flow.authorization_url(
-        access_type="offline", include_granted_scopes="true"
+    # Cambiar URI de redirección a la URL de Template de React o Django
+    # flow.redirect_uri =
+
+    authorization_url, state = flow.authorization_url(
+        prompt="consent", access_type="offline", include_granted_scopes="true"
     )
-    return RedirectResponse(authorization_url)
+    print("Por favor, ve a este enlace: {}".format(authorization_url))
+
+    return authorization_url
