@@ -9,5 +9,3 @@ DATABASE_URL = DATABASE_URL_CONECTION
 engine = create_engine(DATABASE_URL, echo=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bin=engine)
-
-Base = declarative_base()
