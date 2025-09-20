@@ -7,20 +7,34 @@ from models.db_model import Base
 class Remitente(Base):
     """Clase Remitente"""
 
-    __tablename__ = "remitentes"
+    __tablename__ = "remitente"
 
-    id: so.Mapped[int] = so.MappedColumn(
+    id: so.Mapped[int] = so.mapped_column(
         sa.Integer, primary_key=True, autoincrement=True
     )
-    usuario_id: so.Mapped[int] = so.MappedColumn(
-        sa.Integer, sa.ForeignKey("usuarios.id"), nullable=False, index=True
+    usuario_id: so.Mapped[int] = so.mapped_column(
+        sa.Integer, sa.ForeignKey("usuario.id"), nullable=False, index=True
     )
-    nombre_remitente: so.Mapped[str] = so.mapped_column(
-        sa.String(50), nullable=False, index=True
+    nombre_correo: so.Mapped[str] = so.mapped_column(
+        sa.Text, nullable=False, index=True
     )
-    nombre_correo: so.Mapped[str] = so.MappedColumn(
-        sa.String(100), nullable=False, index=True
+    nombre_remitente: so.Mapped[str | None] = so.mapped_column(
+        sa.Text, nullable=True, index=True
     )
-    tipo_correo: so.Mapped[str] = so.MappedColumn(
-        sa.String(50), nullable=False, index=True
+
+    # Relaciones entre tablas
+    usuario: so.Mapped["Usuario"] = so.Relationship(
+        "Usuario", back_populates="remitentes"
+    )
+    emails_enviados: so.Mapped[list["Email"]] = so.relationship(
+        "Email", back_populates="remitente", foreign_keys="Email.remitente_id"
+    )
+    emails_recibidos: so.Mapped[list["Email"]] = so.relationship(
+        "Email", back_populates="remitente", foreign_keys="Email.destinatario_id"
+    )
+    prompt: so.Mapped[list["Prompt"]] = so.relationship(
+        "Prompt", back_populates="remitente"
+    )
+    accion_envio_correo: so.Mapped[list["EnvioCorreoDocente"]] = so.relationship(
+        "EnvioCorreoDocente", back_populates="remitente"
     )
