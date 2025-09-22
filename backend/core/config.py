@@ -1,5 +1,3 @@
-"""Permisos para gmail API"""
-
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/gmail.addons.current.message.action",

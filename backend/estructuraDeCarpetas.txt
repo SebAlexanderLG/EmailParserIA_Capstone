@@ -1,0 +1,39 @@
+backend/
+│── app/
+│   ├── main.py                # Punto de entrada (arranca FastAPI)
+│   ├── api/                   # Rutas (endpoints)
+│   │   ├── __init__.py
+│   │   ├── users.py           # Ej: endpoints para perfil de usuario
+│   │   ├── messages.py        # Ej: endpoints para correos
+│   │   ├── drafts.py          # Ej: endpoints para borradores
+│   │   └── settings.py        # Ej: endpoints de configuración Gmail
+│   │
+│   ├── services/              # Lógica de negocio (conexión con Gmail API, IA, etc.)
+│   │   ├── __init__.py
+│   │   ├── gmail_service.py   # Funciones para llamar a Gmail API
+│   │   ├── ai_service.py      # Funciones para procesar texto con IA
+│   │   └── db_service.py      # Funciones para insertar/leer en PostgreSQL
+│   │
+│   ├── models/                # Modelos de datos
+│   │   ├── __init__.py
+│   │   ├── user.py            # Ej: modelo Pydantic de perfil de usuario
+│   │   ├── message.py         # Ej: modelo Pydantic de mensaje
+│   │   └── db_models.py       # Tablas SQLAlchemy
+│   │
+│   ├── core/                  # Configuración global
+│   │   ├── __init__.py
+│   │   ├── config.py          # Variables de entorno, settings (OAuth, DB, etc.)
+│   │   └── auth.py            # Manejo de tokens y autorización
+│   │
+│   └── utils/                 # Funciones auxiliares
+│       ├── __init__.py
+│       ├── logger.py          # Config de logs
+│       └── helpers.py         # Funciones pequeñas reutilizables
+│
+├── tests/                     # Tests unitarios (pytest)
+│   ├── test_users.py
+│   ├── test_messages.py
+│   └── test_ai.py
+│
+├── requirements.txt           # Dependencias
+└── alembic/                   # Migraciones DB
