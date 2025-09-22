@@ -1,6 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
-from services.authentication import autorizacion_gmail
+from services.authentication import autorizacion_gmail, auth_callback
 from app.database import engine
 
 app = FastAPI()
@@ -10,6 +10,11 @@ app = FastAPI()
 def autenticacion():
     authorization_url = autorizacion_gmail()
     return RedirectResponse(url=authorization_url)
+
+
+@app.get("/auth/callback")
+def callback(request: Request):
+    return auth_callback(request)
 
 
 @app.get("/testbd")
