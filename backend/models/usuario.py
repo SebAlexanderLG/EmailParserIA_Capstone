@@ -29,3 +29,6 @@ class Usuario(Base):
     remitentes: so.Mapped["Remitente"] = so.relationship(
         "Remitente", back_populates="usuario", uselist=False
     )
+    gmail_token: so.Mapped["GmailToken"] = so.relationship(
+        "GmailToken", back_populates="usuario", uselist=False
+    )

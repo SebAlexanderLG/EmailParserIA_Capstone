@@ -3,3 +3,4 @@ from .remitente import Remitente  # noqa: F401
 from .prompt import Prompt  # noqa: F401
 from .email import Email  # noqa: F401
 from .envio_correo_docente import EnvioCorreoDocente  # noqa: F401
+from .token import GmailToken  # noqa: F401
