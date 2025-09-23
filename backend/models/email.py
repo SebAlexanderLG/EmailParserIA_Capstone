@@ -18,7 +18,9 @@ class Email(Base):
         sa.DateTime, nullable=False
     )
     email_id: so.Mapped[int] = so.mapped_column(sa.Text, unique=True, nullable=False)
-    remitente_id: so.Mapped[int] = so.mapped_column(sa.Integer, nullable=False)
+    remitente_id: so.Mapped[int] = so.mapped_column(
+        sa.Integer, sa.ForeignKey("remitente.id"), nullable=False
+    )
     destinatario_id: so.Mapped[int] = so.mapped_column(
         sa.Integer, sa.ForeignKey("remitente.id"), nullable=False
     )

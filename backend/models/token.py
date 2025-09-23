@@ -31,4 +31,6 @@ class GmailToken(Base):
         sa.DateTime(timezone=True), nullable=True
     )
 
-    usuario: so.Mapped["Usuario"] = so.relationship("Usuario", back_populates="token")
+    usuario: so.Mapped["Usuario"] = so.relationship(
+        "Usuario", back_populates="gmail_token"
+    )
