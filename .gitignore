@@ -3,5 +3,8 @@ Arquitectura AI Email Parser.drawio
 Arquitectura inicial.png
 modelo de datos.png
 __pycache__
+node_modules/
+dist/
+
 
 

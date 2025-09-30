@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "react-router-dom": "^7.9.3"
+  },
+  "name": "emailparseria_capstone",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SebAlexanderLG/EmailParserIA_Capstone.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SebAlexanderLG/EmailParserIA_Capstone/issues"
+  },
+  "homepage": "https://github.com/SebAlexanderLG/EmailParserIA_Capstone#readme"
+}
