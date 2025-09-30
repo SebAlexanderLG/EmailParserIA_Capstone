@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from services.auth_service import autorizacion_gmail, auth_callback
 from services.token_service import cargar_credenciales
 
-router = APIRouter()
+router = APIRouter(tags=["Autenticación"])
 
 
 @router.get("/")

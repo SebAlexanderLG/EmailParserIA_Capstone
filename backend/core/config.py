@@ -1,4 +1,5 @@
 SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/gmail.addons.current.message.action",
     "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",

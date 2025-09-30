@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from app.database import engine
 
-router = APIRouter()
+router = APIRouter(tags=["Test"])
 
 
 @router.post("/testbd")

@@ -2,8 +2,9 @@ from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 from googleapiclient.discovery import build
 from services.token_service import cargar_credenciales
+from services.gmail_service import obtener_correos_preview
 
-router = APIRouter()
+router = APIRouter(prefix="/gmail", tags=["Gmail"])
 
 
 @router.post("/perfil_gmail")
@@ -16,4 +17,9 @@ def perfil_gmail(email: str):
     service = build("gmail", "v1", credentials=creds)
     profile = service.users().getProfile(userId="me").execute()
     nombre_usuario = email.split("@")[0]
-    return profile, nombre_usuario
+    return {"profile": profile, "nombre_usuario": nombre_usuario}
+
+
+@router.post("/correos")
+def correos(email: str, limit: int = 10, formato: str = "metadata"):
+    return obtener_correos_preview(email=email, limit=limit, format_type=formato)
