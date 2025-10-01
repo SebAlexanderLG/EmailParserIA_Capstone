@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 from google.auth.transport.requests import Request as GoogleRequest
 from app.database import SessionLocal
 from models import Usuario, GmailToken
@@ -19,7 +20,6 @@ def guardar_token_db(tokens: dict) -> dict:
             token_uri="https://oauth2.googleapis.com/token",
             scopes=SCOPES,
         )
-        from googleapiclient.discovery import build
 
         service = build("gmail", "v1", credentials=creds)
         profile = service.users().getProfile(userId="me").execute()

@@ -10,7 +10,7 @@ def obtener_correos_preview(
 ) -> list:
     """Retorna un preview de cada correo (como la lista de gmail)."""
     if headers is None:
-        headers = []
+        headers = ["From", "Subject", "Date"]
 
     creds = cargar_credenciales(email=email)
     if not creds:

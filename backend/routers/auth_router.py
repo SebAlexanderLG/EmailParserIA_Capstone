@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
-from googleapiclient.discovery import build
 from fastapi.responses import RedirectResponse, JSONResponse
+from googleapiclient.discovery import build
 from services.auth_service import autorizacion_gmail, auth_callback
 from services.token_service import cargar_credenciales
 
@@ -27,4 +27,5 @@ def inicio(email: str | None = None):
 
 @router.get("/auth/callback")
 def callback(request: Request):
+    """Intercambia codigo de autorización por un Token"""
     return auth_callback(request)
