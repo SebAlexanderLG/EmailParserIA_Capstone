@@ -1,4 +1,11 @@
 from googleapiclient.discovery import build
+from utils import (
+    extraer_encabezados,
+    extraer_asunto,
+    extraer_remitente,
+    procesar_payload,
+    extraer_fecha_correo,
+)
 from .token_service import cargar_credenciales
 
 
@@ -60,9 +67,45 @@ def obtener_correos_preview(
                 )
                 correo_simplificado[h.lower()] = valor
             correo_simplificado["snippet"] = correo.get("snippet", "")
+            correo_simplificado["id"] = msg["id"]
 
             correos.append(correo_simplificado)
         else:
             correos.append(correo)
 
     return correos
+
+
+def correo_completo(email: str, mensaje_id: str) -> dict:
+    """Trae el correo completo según su ID"""
+    creds = cargar_credenciales(email=email)
+    if not creds:
+        return {}
+
+    service = build("gmail", "v1", credentials=creds)
+    correo = (
+        service.users()
+        .messages()
+        .get(userId="me", id=mensaje_id, format="full")
+        .execute()
+    )
+
+    payload = correo.get("payload", {})
+
+    # Se extraen los headers
+
+    headers = extraer_encabezados(payload)
+    asunto = extraer_asunto(headers)
+    remitente = extraer_remitente(headers)
+    fecha = extraer_fecha_correo(headers)
+
+    body_text, body_html, attachments = procesar_payload(payload, service, mensaje_id)
+
+    return {
+        "from": remitente,
+        "subject": asunto,
+        "date": fecha,
+        "body_text": body_text,
+        "body_html": body_html,
+        "attachments": attachments,
+    }
