@@ -13,3 +13,8 @@ CLIENT_SECRETS_FILE = "credentials.json"
 DATABASE_URL_CONECTION = "postgresql://postgres:1234@localhost:5432/parser"
 
 origins = ["http://localhost:5173"]
+
+prompt = {
+    "model": "llama3",
+    "prompt": "Analiza el correo y dime de que trata",
+}

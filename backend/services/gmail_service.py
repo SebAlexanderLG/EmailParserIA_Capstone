@@ -1,4 +1,5 @@
 from googleapiclient.discovery import build
+from fastapi.responses import RedirectResponse
 from utils import (
     extraer_encabezados,
     extraer_asunto,
@@ -7,6 +8,18 @@ from utils import (
     extraer_fecha_correo,
 )
 from .token_service import cargar_credenciales
+
+
+def obtener_perfil(email: str):
+    """Función que obtiene el perfil de usuario a partir de un servicio"""
+    creds = cargar_credenciales(email=email)
+    if not creds:
+        return RedirectResponse(url="/")
+
+    service = build("gmail", "v1", credentials=creds)
+    profile = service.users().getProfile(userId="me").execute()
+    nombre_usuario = email.split("@")[0]
+    return {"profile": profile, "nombre_usuario": nombre_usuario}
 
 
 def obtener_correos_preview(

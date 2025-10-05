@@ -1,11 +1,12 @@
 import json
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from fastapi import Request
-import google.oauth2.id_token
-from google.auth.transport import requests
+from fastapi.responses import RedirectResponse
 import google_auth_oauthlib.flow
-from core.config import SCOPES, CLIENT_SECRETS_FILE
+from googleapiclient.discovery import build
 from .token_service import guardar_token_db
+from core.config import SCOPES, CLIENT_SECRETS_FILE
+from .gmail_service import obtener_perfil
 
 
 def auth_load() -> dict:
@@ -37,6 +38,29 @@ def auth_callback(request: Request) -> JSONResponse:
     flow.redirect_uri = "http://localhost:8000/auth/callback"
     tokens = flow.fetch_token(code=code)
 
+    creds = flow.credentials
+
+    service = build("gmail", "v1", credentials=creds)
+    profile_gmail = service.users().getProfile(userId="me").execute()
+    email_usuario = profile_gmail["emailAddress"]
+
     # Guardar token en DB
-    response = guardar_token_db(tokens)
-    return JSONResponse(content=response)
+    guardar_token_db(tokens)
+
+    perfil = obtener_perfil(email_usuario)
+    perfil["nombre_usuario"]
+
+    response = RedirectResponse(url="http://localhost:5173/redirect")
+
+    response.set_cookie(
+        key="email",
+        value=email_usuario,
+        httponly=True,
+        secure=False,
+        max_age=60 * 60 * 24,
+        samesite="lax",
+    )
+
+    return response
+    # response = guardar_token_db(tokens)
+    # return JSONResponse(content=response)
