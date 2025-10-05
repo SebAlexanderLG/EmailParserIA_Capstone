@@ -4,8 +4,9 @@ from fastapi import Request
 from fastapi.responses import RedirectResponse
 import google_auth_oauthlib.flow
 from googleapiclient.discovery import build
-from .token_service import guardar_token_db
+from datetime import timedelta
 from core.config import SCOPES, CLIENT_SECRETS_FILE
+from .token_service import guardar_token_db
 from .gmail_service import obtener_perfil
 
 
@@ -25,8 +26,7 @@ def autorizacion_gmail() -> str:
     return authorization_url
 
 
-def auth_callback(request: Request) -> JSONResponse:
-    """Intercambia código de autorización por token y guarda en DB"""
+def auth_callback(request: Request) -> RedirectResponse:
     code: str | None = request.query_params.get("code")
     if not code:
         return JSONResponse(
@@ -39,7 +39,6 @@ def auth_callback(request: Request) -> JSONResponse:
     tokens = flow.fetch_token(code=code)
 
     creds = flow.credentials
-
     service = build("gmail", "v1", credentials=creds)
     profile_gmail = service.users().getProfile(userId="me").execute()
     email_usuario = profile_gmail["emailAddress"]
@@ -47,20 +46,18 @@ def auth_callback(request: Request) -> JSONResponse:
     # Guardar token en DB
     guardar_token_db(tokens)
 
-    perfil = obtener_perfil(email_usuario)
-    perfil["nombre_usuario"]
+    # Redirige a frontend con email en query params
 
-    response = RedirectResponse(url="http://localhost:5173/redirect")
-
+    redirect_url = "http://localhost:5173/bandeja"
+    response = RedirectResponse(url=redirect_url)
     response.set_cookie(
         key="email",
         value=email_usuario,
         httponly=True,
+        samesite="Lax",
         secure=False,
-        max_age=60 * 60 * 24,
-        samesite="lax",
+        max_age=7 * 24 * 3600,
+        path="/",
+        domain="localhost",
     )
-
     return response
-    # response = guardar_token_db(tokens)
-    # return JSONResponse(content=response)
