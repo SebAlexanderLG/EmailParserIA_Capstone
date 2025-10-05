@@ -1,23 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import "./Bandeja.css";
 import { useNavigate } from "react-router-dom";
-import { obtenerPerfil, obtenerCorreos } from "../api/gmail"; // 👈 importa tus nuevas funciones
+import { obtenerPerfil, obtenerCorreos } from "../api/gmail";
+import "./Bandeja.css";
 
 export default function Bandeja() {
   const [tab, setTab] = useState("no-leidos");
   const [q, setQ] = useState("");
   const [correos, setCorreos] = useState([]);
   const [nombreUsuario, setNombreUsuario] = useState("");
+  const [loading, setLoading] = useState(true);
   const navegar = useNavigate();
 
   useEffect(() => {
-    // ✅ El backend obtiene el email desde la cookie automáticamente
+    // Obtener perfil
     obtenerPerfil()
       .then((data) => {
         if (data.error) {
           navegar("/");
         } else {
-          setNombreUsuario(data.nombre_usuario);
+          setNombreUsuario(data.nombre_real);
         }
       })
       .catch((err) => {
@@ -25,13 +26,12 @@ export default function Bandeja() {
         navegar("/");
       });
 
-    // ✅ Traer correos
+    // Traer correos (solo metadata)
+    setLoading(true);
     obtenerCorreos(20, "metadata")
-      .then((data) => {
-        console.log("Correos recibidos:", data);
-        setCorreos(data);
-      })
-      .catch((err) => console.error("Error obteniendo correos:", err));
+      .then((data) => setCorreos(data))
+      .catch((err) => console.error("Error obteniendo correos:", err))
+      .finally(() => setLoading(false));
   }, []);
 
   const lista = useMemo(() => {
@@ -41,15 +41,14 @@ export default function Bandeja() {
     const term = q.trim().toLowerCase();
     if (!term) return base;
     return base.filter((c) =>
-      (c.remitente + " " + c.asunto + " " + c.mensaje)
+      (c.from_name + " " + c.subject + " " + c.snippet)
         .toLowerCase()
         .includes(term)
     );
   }, [tab, q, correos]);
 
   const cerrarSesion = () => {
-    // ✅ elimina la cookie del backend (opcionalmente podrías tener endpoint /logout)
-    document.cookie = "email=; max-age=0; path=/";
+    // Limpiar cookie desde frontend no es necesario, backend debería manejarlo
     navegar("/");
   };
 
@@ -86,37 +85,45 @@ export default function Bandeja() {
       </header>
 
       <section className="tabla-wrap">
-        <table className="tabla">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Remitente</th>
-              <th>Asunto</th>
-              <th>Mensaje</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lista.map((c) => (
-              <tr
-                key={c.id}
-                onClick={() => navegar(`/correo/${c.id}`)}
-                style={{ cursor: "pointer" }}
-              >
-                <td>{c.date}</td>
-                <td>{c.from_name}</td>
-                <td>{c.subject}</td>
-                <td className="msg">{c.snippet}</td>
-              </tr>
-            ))}
-            {lista.length === 0 && (
+        {loading ? (
+          <div className="cargando-container">
+            <div className="cargando">
+              Cargando mensajes<span className="spinner"></span>
+            </div>
+          </div>
+        ) : (
+          <table className="tabla">
+            <thead>
               <tr>
-                <td colSpan="4" className="vacio">
-                  Sin resultados
-                </td>
+                <th>Fecha</th>
+                <th>Remitente</th>
+                <th>Asunto</th>
+                <th>Mensaje</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {lista.map((c) => (
+                <tr
+                  key={c.id}
+                  onClick={() => navegar(`/correo/${c.id}`)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <td>{c.date}</td>
+                  <td>{c.from_name}</td>
+                  <td>{c.subject}</td>
+                  <td className="msg">{c.snippet}</td>
+                </tr>
+              ))}
+              {lista.length === 0 && (
+                <tr>
+                  <td colSpan="4" className="vacio">
+                    Sin resultados
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </section>
     </main>
   );

@@ -84,3 +84,32 @@ tr:hover{
   padding:20px;
   color:#6b7280
 }
+
+.cargando-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px; 
+}
+
+.cargando {
+  font-size: 1.2rem;
+  color: #333;
+  text-align: center;
+}
+
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 3px solid #ccc;
+  border-top: 3px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-left: 10px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

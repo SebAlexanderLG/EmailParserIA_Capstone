@@ -15,7 +15,6 @@ export default function Inicio() {
 
       <div className="botones">
         <button className="btn" onClick={iniciarSesionGmail}>Iniciar sesión con Gmail<img src={logoGmail} alt='Gmail' className='logoGmail'/></button>
-        <button className="btn secundario" onClick={() => alert('Demo 👋')}>Ver demo</button>
       </div>
     </main>
   )
