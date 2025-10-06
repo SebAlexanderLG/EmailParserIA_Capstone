@@ -1,3 +1,4 @@
+import parse from "html-react-parser"
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { obtenerCorreoCompleto } from "../api/gmail";
@@ -38,7 +39,7 @@ export default function DetalleCorreo() {
             <button className="btn" onClick={() => navegar("/bandeja")}>
             Volver
             </button>
-        </div>
+        </div>+
         </main>
     );
 
@@ -54,8 +55,8 @@ export default function DetalleCorreo() {
         ) : (
             <div
             className="mensaje"
-            dangerouslySetInnerHTML={{ __html: correo.body_html }}
-            />
+            >{ parse(correo.body_html )}
+            </div>
         )}
 
         <div className="acciones">

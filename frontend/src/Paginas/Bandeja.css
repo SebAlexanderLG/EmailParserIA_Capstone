@@ -32,9 +32,10 @@
   cursor:pointer;
 }
 
-.tabs{
-  display:flex;
-  gap:8px
+.tabs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 .tab{
   padding:8px 12px;
@@ -112,4 +113,18 @@ tr:hover{
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+.prompt {
+  margin-left: auto; /* empuja el botón al extremo derecho */
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.prompt:hover {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
 }

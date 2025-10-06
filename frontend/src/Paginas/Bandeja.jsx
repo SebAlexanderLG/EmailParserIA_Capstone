@@ -82,6 +82,11 @@ export default function Bandeja() {
             Leídos
           </button>
         </div>
+        <div className="prompts">
+          <button className="prompt" onClick={() => {}}>
+            Cambiar parámetros de IA
+          </button>
+        </div>
       </header>
 
       <section className="tabla-wrap">
