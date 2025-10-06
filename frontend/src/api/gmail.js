@@ -43,3 +43,28 @@ export async function obtenerCorreoCompleto(id) {
 
   return await res.json();
 }
+
+export async function descargarAdjunto(mensajeId, attachmentId, filename) {
+  const url = `${API_URL}/gmail/descargar_adjunto?mensaje_id=${mensajeId}&attachment_id=${attachmentId}&filename=${encodeURIComponent(
+    filename || ""
+  )}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Error al descargar adjunto: ${errText}`);
+  }
+
+  // ✅ Crear descarga directa
+  const blob = await response.blob();
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename || "archivo.bin";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}

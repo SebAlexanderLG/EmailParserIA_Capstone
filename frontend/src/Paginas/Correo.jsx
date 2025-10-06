@@ -1,7 +1,7 @@
 import parse from "html-react-parser"
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { obtenerCorreoCompleto } from "../api/gmail";
+import { obtenerCorreoCompleto, descargarAdjunto } from "../api/gmail";
 import "./Correo.css";
 
 export default function DetalleCorreo() {
@@ -57,6 +57,26 @@ export default function DetalleCorreo() {
             className="mensaje"
             >{ parse(correo.body_html )}
             </div>
+        )}
+        {/* 👇 Bloque agregado para mostrar los adjuntos */}
+        {correo.attachments && correo.attachments.length > 0 && (
+        <div className="adjuntos">
+            <h4>Archivos adjuntos:</h4>
+            <ul>
+            {correo.attachments.map((adj, i) => (
+                <li key={i}>
+                <button
+                    className="btn-secundario"
+                    onClick={() =>
+                    descargarAdjunto(id, adj.attachmentId, adj.filename)
+                    }
+                >
+                    {adj.filename} ({Math.round(adj.size / 1024)} KB)
+                </button>
+                </li>
+            ))}
+            </ul>
+        </div>
         )}
 
         <div className="acciones">

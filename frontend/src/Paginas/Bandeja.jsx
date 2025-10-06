@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { obtenerPerfil, obtenerCorreos } from "../api/gmail";
+import { obtenerPerfil, obtenerCorreos, descargarAdjunto } from "../api/gmail";
 import "./Bandeja.css";
 
 export default function Bandeja() {
