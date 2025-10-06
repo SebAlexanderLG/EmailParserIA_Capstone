@@ -1,3 +1,5 @@
+from bs4 import BeautifulSoup
+from fastapi import HTTPException
 from email.utils import parsedate_to_datetime
 from googleapiclient.discovery import build
 from fastapi.responses import RedirectResponse
@@ -118,11 +120,35 @@ def obtener_correos_preview(
     return correos
 
 
+def limpiar_html(html: str) -> str:
+    """Devuelve solo el contenido visible del body del HTML"""
+    soup = BeautifulSoup(html, "html.parser")
+
+    # eliminar head
+    if soup.head:
+        soup.head.decompose()
+
+    # eliminar estilos y scripts
+    for tag in soup(["style", "script"]):
+        tag.decompose()
+
+    # eliminar comentarios
+    for comment in soup.find_all(
+        string=lambda text: isinstance(text, type(soup.Comment))
+    ):
+        comment.extract()
+
+    # devolver solo el body si existe
+    if soup.body:
+        return str(soup.body)
+    return str(soup)
+
+
 def correo_completo(email: str, mensaje_id: str) -> dict:
-    """Trae el correo completo según su ID"""
+    """Trae el correo completo según su ID y limpia HTML pesado"""
     creds = cargar_credenciales(email=email)
     if not creds:
-        return {}
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
     service = build("gmail", "v1", credentials=creds)
     correo = (
@@ -133,15 +159,20 @@ def correo_completo(email: str, mensaje_id: str) -> dict:
     )
 
     payload = correo.get("payload", {})
-
-    # Se extraen los headers
-
     headers = extraer_encabezados(payload)
     asunto = extraer_asunto(headers)
     remitente = extraer_remitente(headers)
     fecha = extraer_fecha_correo(headers)
 
     body_text, body_html, attachments = procesar_payload(payload, service, mensaje_id)
+
+    # Si no hay texto plano, crearlo a partir del HTML
+    if not body_text and body_html:
+        body_text = BeautifulSoup(body_html, "html.parser").get_text("\n", strip=True)
+
+    # Limpiar HTML antes de enviarlo
+    if body_html:
+        body_html = limpiar_html(body_html)
 
     return {
         "from": remitente,
