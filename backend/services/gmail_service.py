@@ -1,6 +1,6 @@
+from email.utils import parsedate_to_datetime
 from bs4 import BeautifulSoup
 from fastapi import HTTPException
-from email.utils import parsedate_to_datetime
 from googleapiclient.discovery import build
 from fastapi.responses import RedirectResponse
 from utils import (

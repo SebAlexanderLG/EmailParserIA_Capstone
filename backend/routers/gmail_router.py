@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Request, HTTPException
 from fastapi import Body
 from fastapi.responses import JSONResponse
+from utils.correos import descargar_adjunto_gmail
 from services.gmail_service import (
     obtener_nombre_real,
     obtener_correos_preview,
@@ -48,3 +49,19 @@ def correos(mensaje_id: str, request: Request):
     if not email:
         raise HTTPException(status_code=401, detail="No se encontró el email")
     return correo_completo(email=email, mensaje_id=mensaje_id)
+
+
+@router.get("/descargar_adjunto")
+def descargar_adjunto_correo(
+    request: Request, mensaje_id: str, attachment_id: str, filename: str = None
+):
+    email = request.cookies.get("email")
+    if not email:
+        raise HTTPException(status_code=401, detail="No autenticado")
+
+    return descargar_adjunto_gmail(
+        email=email,
+        mensaje_id=mensaje_id,
+        attachment_id=attachment_id,
+        filename=filename,
+    )
