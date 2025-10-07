@@ -68,3 +68,39 @@ export async function descargarAdjunto(mensajeId, attachmentId, filename) {
   link.click();
   document.body.removeChild(link);
 }
+
+/*Función para marcar correos leidos */
+
+export async function marcarComoLeido(mensajeId) {
+  const res = await fetch(`${API_URL}/gmail/marcar_leido`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ mensaje_id: mensajeId }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Error al marcar como leído: ${errText}`);
+  }
+
+  return await res.json();
+}
+
+/* Función para eliminar correos */
+
+export async function eliminarCorreo(mensajeId) {
+  const res = await fetch(`${API_URL}/gmail/eliminar_correo`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ mensaje_id: mensajeId }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Error al eliminar correo: ${errText}`);
+  }
+
+  return await res.json();
+}

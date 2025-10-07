@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { obtenerPerfil, obtenerCorreos, descargarAdjunto } from "../api/gmail";
+import { obtenerPerfil, obtenerCorreos, marcarComoLeido, eliminarCorreo } from "../api/gmail";
 import "./Bandeja.css";
 
 export default function Bandeja() {
@@ -11,33 +11,34 @@ export default function Bandeja() {
   const [loading, setLoading] = useState(true);
   const navegar = useNavigate();
 
+  // Cargar perfil y correos
   useEffect(() => {
-    // Obtener perfil
-    obtenerPerfil()
-      .then((data) => {
-        if (data.error) {
+    const cargarDatos = async () => {
+      try {
+        const perfil = await obtenerPerfil();
+        if (perfil.error) {
           navegar("/");
-        } else {
-          setNombreUsuario(data.nombre_real);
+          return;
         }
-      })
-      .catch((err) => {
-        console.error("Error obteniendo perfil:", err);
+        setNombreUsuario(perfil.nombre_real);
+
+        setLoading(true);
+        const correosData = await obtenerCorreos(50, "metadata"); 
+        setCorreos(correosData); // la propiedad "leido" ya viene del backend
+      } catch (err) {
+        console.error("Error cargando datos:", err);
         navegar("/");
-      });
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    // Traer correos (solo metadata)
-    setLoading(true);
-    obtenerCorreos(20, "metadata")
-      .then((data) => setCorreos(data))
-      .catch((err) => console.error("Error obteniendo correos:", err))
-      .finally(() => setLoading(false));
-  }, []);
+    cargarDatos();
+  }, [navegar]);
 
+  // Filtrar lista según tab y búsqueda
   const lista = useMemo(() => {
-    const base = correos.filter((c) =>
-      tab === "leidos" ? c.leido : !c.leido
-    );
+    const base = correos.filter((c) => (tab === "leidos" ? c.leido : !c.leido));
     const term = q.trim().toLowerCase();
     if (!term) return base;
     return base.filter((c) =>
@@ -47,9 +48,33 @@ export default function Bandeja() {
     );
   }, [tab, q, correos]);
 
-  const cerrarSesion = () => {
-    // Limpiar cookie desde frontend no es necesario, backend debería manejarlo
-    navegar("/");
+  const cerrarSesion = () => navegar("/");
+
+  const handleEliminar = async (id) => {
+    if (!window.confirm("¿Eliminar este correo de Gmail?")) return;
+    try {
+      await eliminarCorreo(id);
+      setCorreos(prev => prev.filter(c => c.id !== id));
+    } catch (err) {
+      console.error("Error eliminando correo:", err);
+      alert("No se pudo eliminar el correo.");
+    }
+  };
+
+  const handleAbrirCorreo = async (c) => {
+    navegar(`/correo/${c.id}`);
+    if (!c.leido) {
+      try {
+        await marcarComoLeido(c.id);
+        setCorreos(prev =>
+          prev.map(x => (x.id === c.id ? { ...x, leido: true } : x))
+        );
+        // ✅ Cambiar a la pestaña "Leídos" automáticamente
+        setTab("leidos");
+      } catch (err) {
+        console.error("Error marcando como leído:", err);
+      }
+    }
   };
 
   return (
@@ -64,9 +89,7 @@ export default function Bandeja() {
         />
         <div className="usuario">
           <span>{nombreUsuario}</span>
-          <button onClick={cerrarSesion} className="btn-cerrar">
-            Cerrar sesión
-          </button>
+          <button onClick={cerrarSesion} className="btn-cerrar">Cerrar sesión</button>
         </div>
         <div className="tabs">
           <button
@@ -83,9 +106,7 @@ export default function Bandeja() {
           </button>
         </div>
         <div className="prompts">
-          <button className="prompt" onClick={() => {}}>
-            Cambiar parámetros de IA
-          </button>
+          <button className="prompt" onClick={() => {}}>Cambiar parámetros de IA</button>
         </div>
       </header>
 
@@ -104,26 +125,32 @@ export default function Bandeja() {
                 <th>Remitente</th>
                 <th>Asunto</th>
                 <th>Mensaje</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {lista.map((c) => (
-                <tr
-                  key={c.id}
-                  onClick={() => navegar(`/correo/${c.id}`)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <td>{c.date}</td>
-                  <td>{c.from_name}</td>
-                  <td>{c.subject}</td>
-                  <td className="msg">{c.snippet}</td>
+                <tr key={c.id} style={{ cursor: "pointer" }}>
+                  <td onClick={() => handleAbrirCorreo(c)}>{c.date}</td>
+                  <td onClick={() => handleAbrirCorreo(c)}>{c.from_name}</td>
+                  <td onClick={() => handleAbrirCorreo(c)}>{c.subject}</td>
+                  <td className="msg" onClick={() => handleAbrirCorreo(c)}>{c.snippet}</td>
+                  <td>
+                    <button
+                      className="btn-menu"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEliminar(c.id);
+                      }}
+                    >
+                      ⋮
+                    </button>
+                  </td>
                 </tr>
               ))}
               {lista.length === 0 && (
                 <tr>
-                  <td colSpan="4" className="vacio">
-                    Sin resultados
-                  </td>
+                  <td colSpan="5" className="vacio">Sin resultados</td>
                 </tr>
               )}
             </tbody>
