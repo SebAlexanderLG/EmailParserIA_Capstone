@@ -58,14 +58,13 @@ def obtener_correos_preview(
 
     service = build("gmail", "v1", credentials=creds)
 
-    # Lista IDs de correos
+    # Lista IDs de correos (quitamos el filtro is:unread)
     results = (
         service.users()
         .messages()
         .list(
             userId="me",
             labelIds=["INBOX"],
-            q="is:unread -category:promotions -category:social",
             maxResults=limit,
         )
         .execute()
@@ -113,6 +112,10 @@ def obtener_correos_preview(
                 correo_simplificado["from_name"] = correo_simplificado.get("from", "")
             correo_simplificado["snippet"] = correo.get("snippet", "")
             correo_simplificado["id"] = msg["id"]
+
+            # ✅ Aquí adaptamos para detectar si está leído
+            labels = correo.get("labelIds", [])
+            correo_simplificado["leido"] = "UNREAD" not in labels
 
             correos.append(correo_simplificado)
         else:
@@ -182,3 +185,31 @@ def correo_completo(email: str, mensaje_id: str) -> dict:
         "body_html": body_html,
         "attachments": attachments,
     }
+
+
+def marcar_correo_leido(email: str, mensaje_id: str):
+    """Función que marca un correo como leído (quita la etiqueta UNREAD)"""
+    creds = cargar_credenciales(email=email)
+    if not creds:
+        raise HTTPException(status_code=401, detail="Credenciales no validas")
+
+    service = build("gmail", "v1", credentials=creds)
+
+    service.users().messages().modify(
+        userId="me", id=mensaje_id, body={"removeLabelIds": ["UNREAD"]}
+    ).execute()
+
+    return {"ok": True, "mensaje_id": mensaje_id}
+
+
+def eliminar_correo(email: str, mensaje_id: str):
+    """Función que permite eliminar un correo de la bandeja"""
+    creds = cargar_credenciales(email=email)
+    if not creds:
+        raise HTTPException(status_code=401, detail="Credenciales no validas")
+
+    service = build("gmail", "v1", credentials=creds)
+
+    service.users().messages().trash(userId="me", id=mensaje_id).execute()
+
+    return {"ok": True, "mensaje_id": mensaje_id}

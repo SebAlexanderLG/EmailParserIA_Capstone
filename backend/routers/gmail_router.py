@@ -6,6 +6,8 @@ from services.gmail_service import (
     obtener_nombre_real,
     obtener_correos_preview,
     correo_completo,
+    marcar_correo_leido,
+    eliminar_correo,
 )
 
 router = APIRouter(prefix="/gmail", tags=["Gmail"])
@@ -44,6 +46,7 @@ def logout():
 
 @router.get("/correos")
 def correos(mensaje_id: str, request: Request):
+    """Endpoint que trae correo completo"""
     # Leer email desde la cookie HttpOnly enviada en el request
     email = request.cookies.get("email")
     if not email:
@@ -55,6 +58,7 @@ def correos(mensaje_id: str, request: Request):
 def descargar_adjunto_correo(
     request: Request, mensaje_id: str, attachment_id: str, filename: str = None
 ):
+    """Endpoint que permite descargar archivos adjuntos de un correo"""
     email = request.cookies.get("email")
     if not email:
         raise HTTPException(status_code=401, detail="No autenticado")
@@ -65,3 +69,30 @@ def descargar_adjunto_correo(
         attachment_id=attachment_id,
         filename=filename,
     )
+
+
+@router.post("/marcar_leido")
+def marcar_leido(request: Request, body: dict = Body(...)):
+    """Endpoint que permite marcar un correo como leido"""
+    email = request.cookies.get("email")
+    if not email:
+        raise HTTPException(status_code=401, detail="No autenticado")
+    mensaje_id = body.get("mensaje_id")
+    if not mensaje_id:
+        raise HTTPException(
+            status_code=400, detail="Faltan parametros para la solicitud."
+        )
+    return marcar_correo_leido(email=email, mensaje_id=mensaje_id)
+
+
+@router.delete("/eliminar_correo")
+def eliminar_correo_gmail(request: Request, body: dict = Body(...)):
+    email = request.cookies.get("email")
+    if not email:
+        raise HTTPException(status_code=4001, detail="No autenticado")
+    mensaje_id = body.get("mensaje_id")
+    if not mensaje_id:
+        raise HTTPException(
+            status_code=400, detail="Faltan parametros para la solicitud."
+        )
+    return eliminar_correo(email=email, mensaje_id=mensaje_id)

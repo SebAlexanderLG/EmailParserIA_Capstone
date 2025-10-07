@@ -7,7 +7,6 @@ from googleapiclient.discovery import build
 from datetime import timedelta
 from core.config import SCOPES, CLIENT_SECRETS_FILE
 from .token_service import guardar_token_db
-from .gmail_service import obtener_perfil
 
 
 def auth_load() -> dict:
