@@ -9,6 +9,7 @@ export default function Bandeja() {
   const [correos, setCorreos] = useState([]);
   const [nombreUsuario, setNombreUsuario] = useState("");
   const [loading, setLoading] = useState(true);
+  const [correoAEliminar, setCorreoAEliminar] = useState(null); // ✅ Estado para el modal
   const navegar = useNavigate();
 
   // Cargar perfil y correos
@@ -23,8 +24,8 @@ export default function Bandeja() {
         setNombreUsuario(perfil.nombre_real);
 
         setLoading(true);
-        const correosData = await obtenerCorreos(50, "metadata"); 
-        setCorreos(correosData); // la propiedad "leido" ya viene del backend
+        const correosData = await obtenerCorreos(50, "metadata");
+        setCorreos(correosData);
       } catch (err) {
         console.error("Error cargando datos:", err);
         navegar("/");
@@ -50,11 +51,12 @@ export default function Bandeja() {
 
   const cerrarSesion = () => navegar("/");
 
-  const handleEliminar = async (id) => {
-    if (!window.confirm("¿Eliminar este correo de Gmail?")) return;
+  const handleEliminarConfirmado = async () => {
+    if (!correoAEliminar) return;
     try {
-      await eliminarCorreo(id);
-      setCorreos(prev => prev.filter(c => c.id !== id));
+      await eliminarCorreo(correoAEliminar.id);
+      setCorreos(prev => prev.filter(c => c.id !== correoAEliminar.id));
+      setCorreoAEliminar(null); // cerrar modal
     } catch (err) {
       console.error("Error eliminando correo:", err);
       alert("No se pudo eliminar el correo.");
@@ -69,7 +71,6 @@ export default function Bandeja() {
         setCorreos(prev =>
           prev.map(x => (x.id === c.id ? { ...x, leido: true } : x))
         );
-        // ✅ Cambiar a la pestaña "Leídos" automáticamente
         setTab("leidos");
       } catch (err) {
         console.error("Error marcando como leído:", err);
@@ -140,7 +141,7 @@ export default function Bandeja() {
                       className="btn-menu"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleEliminar(c.id);
+                        setCorreoAEliminar(c); // ✅ Abre modal en lugar de confirmar directo
                       }}
                     >
                       ⋮
@@ -157,6 +158,28 @@ export default function Bandeja() {
           </table>
         )}
       </section>
+      {correoAEliminar && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <p>¿Eliminar el correo de <strong>{correoAEliminar.from_name}</strong>?</p>
+            <p className="modal-subject">{correoAEliminar.subject}</p>
+            <div className="modal-actions">
+              <button
+                className="btn-cancel"
+                onClick={() => setCorreoAEliminar(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-confirm"
+                onClick={handleEliminarConfirmado}
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
