@@ -23,18 +23,9 @@ class Remitente(Base):
     )
 
     # Relaciones entre tablas
-    usuario: so.Mapped["Usuario"] = so.Relationship(
+    usuario: so.Mapped["Usuario"] = so.relationship(
         "Usuario", back_populates="remitentes"
     )
     emails_enviados: so.Mapped[list["Email"]] = so.relationship(
         "Email", back_populates="remitente", foreign_keys="Email.remitente_id"
-    )
-    emails_recibidos: so.Mapped[list["Email"]] = so.relationship(
-        "Email", back_populates="remitente", foreign_keys="Email.destinatario_id"
-    )
-    prompt: so.Mapped[list["Prompt"]] = so.relationship(
-        "Prompt", back_populates="remitente"
-    )
-    accion_envio_correo: so.Mapped[list["EnvioCorreoDocente"]] = so.relationship(
-        "EnvioCorreoDocente", back_populates="remitente"
     )

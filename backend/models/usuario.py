@@ -32,3 +32,9 @@ class Usuario(Base):
     gmail_token: so.Mapped["GmailToken"] = so.relationship(
         "GmailToken", back_populates="usuario", uselist=False
     )
+    emails_recibidos: so.Mapped[list["Email"]] = so.relationship(
+        "Email", back_populates="destinatario"
+    )
+    prompts: so.Mapped[list["Prompt"]] = so.relationship(
+        "Prompt", back_populates="usuario"
+    )

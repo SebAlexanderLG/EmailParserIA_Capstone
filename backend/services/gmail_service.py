@@ -1,8 +1,8 @@
 from email.utils import parsedate_to_datetime
 from bs4 import BeautifulSoup
-from fastapi import HTTPException
-from googleapiclient.discovery import build
 from fastapi.responses import RedirectResponse
+from googleapiclient.discovery import build
+from utils.correos import manejo_credenciales
 from utils import (
     extraer_encabezados,
     extraer_asunto,
@@ -27,9 +27,7 @@ def obtener_perfil(email: str):
 
 def obtener_nombre_real(email: str):
     """Función que obtiene el nombre real del usuario Gmail"""
-    creds = cargar_credenciales(email=email)
-    if not creds:
-        return {"error": "No hay credenciales"}
+    creds = manejo_credenciales(email)
 
     # Construir servicio de People API
     service = build("people", "v1", credentials=creds)
@@ -52,13 +50,10 @@ def obtener_correos_preview(
     if headers is None:
         headers = ["From", "Subject", "Date"]
 
-    creds = cargar_credenciales(email=email)
-    if not creds:
-        return []
+    creds = manejo_credenciales(email)
 
     service = build("gmail", "v1", credentials=creds)
 
-    # Lista IDs de correos (quitamos el filtro is:unread)
     results = (
         service.users()
         .messages()
@@ -113,7 +108,6 @@ def obtener_correos_preview(
             correo_simplificado["snippet"] = correo.get("snippet", "")
             correo_simplificado["id"] = msg["id"]
 
-            # ✅ Aquí adaptamos para detectar si está leído
             labels = correo.get("labelIds", [])
             correo_simplificado["leido"] = "UNREAD" not in labels
 
@@ -149,10 +143,7 @@ def limpiar_html(html: str) -> str:
 
 def correo_completo(email: str, mensaje_id: str) -> dict:
     """Trae el correo completo según su ID y limpia HTML pesado"""
-    creds = cargar_credenciales(email=email)
-    if not creds:
-        raise HTTPException(status_code=401, detail="Credenciales inválidas")
-
+    creds = manejo_credenciales(email)
     service = build("gmail", "v1", credentials=creds)
     correo = (
         service.users()
@@ -189,12 +180,8 @@ def correo_completo(email: str, mensaje_id: str) -> dict:
 
 def marcar_correo_leido(email: str, mensaje_id: str):
     """Función que marca un correo como leído (quita la etiqueta UNREAD)"""
-    creds = cargar_credenciales(email=email)
-    if not creds:
-        raise HTTPException(status_code=401, detail="Credenciales no validas")
-
+    creds = manejo_credenciales(email)
     service = build("gmail", "v1", credentials=creds)
-
     service.users().messages().modify(
         userId="me", id=mensaje_id, body={"removeLabelIds": ["UNREAD"]}
     ).execute()
@@ -204,12 +191,8 @@ def marcar_correo_leido(email: str, mensaje_id: str):
 
 def eliminar_correo(email: str, mensaje_id: str):
     """Función que permite eliminar un correo de la bandeja"""
-    creds = cargar_credenciales(email=email)
-    if not creds:
-        raise HTTPException(status_code=401, detail="Credenciales no validas")
-
+    creds = manejo_credenciales(email)
     service = build("gmail", "v1", credentials=creds)
-
     service.users().messages().trash(userId="me", id=mensaje_id).execute()
 
     return {"ok": True, "mensaje_id": mensaje_id}

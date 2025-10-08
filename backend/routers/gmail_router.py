@@ -36,14 +36,6 @@ def correos_preview(request: Request, body: dict = Body(...)):
     return obtener_correos_preview(email, limit, formato)
 
 
-@router.post("/logout")
-def logout():
-    """Endpoint para cerrar sesión"""
-    response = JSONResponse({"ok": True})
-    response.delete_cookie("email", path="/")
-    return response
-
-
 @router.get("/correos")
 def correos(mensaje_id: str, request: Request):
     """Endpoint que trae correo completo"""
@@ -96,3 +88,11 @@ def eliminar_correo_gmail(request: Request, body: dict = Body(...)):
             status_code=400, detail="Faltan parametros para la solicitud."
         )
     return eliminar_correo(email=email, mensaje_id=mensaje_id)
+
+
+@router.post("/logout")
+def logout():
+    """Endpoint para cerrar sesión"""
+    response = JSONResponse({"ok": True})
+    response.delete_cookie("email", path="/")
+    return response

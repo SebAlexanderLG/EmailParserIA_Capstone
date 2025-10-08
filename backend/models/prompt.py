@@ -19,11 +19,9 @@ class Prompt(Base):
         default=lambda: datetime.now(timezone.utc),
     )
     contexto: so.Mapped[str] = so.mapped_column(sa.Text, nullable=False)
-    remitente_id: so.Mapped[int] = so.mapped_column(
-        sa.Integer, sa.ForeignKey("remitente.id"), nullable=False, unique=True
+    usuario_id: so.Mapped[int] = so.mapped_column(
+        sa.Integer, sa.ForeignKey("usuario.id"), nullable=False
     )
 
     # Relación con Remitente
-    remitente: so.Mapped["Remitente"] = so.relationship(
-        "Remitente", back_populates="prompt"
-    )
+    usuario: so.Mapped["Usuario"] = so.relationship("Usuario", back_populates="prompts")
