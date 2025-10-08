@@ -12,4 +12,6 @@
 .btn{
   padding:10px 14px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer
 }
-.primario{ background:#e0e7ff; border-color:#a5b4fc }
+.primario{ background:#e0e7ff; border-color:#a5b4fc 
+}
+.respuesta{ background: #e0e7ff; border-color:#a5b4fc}
