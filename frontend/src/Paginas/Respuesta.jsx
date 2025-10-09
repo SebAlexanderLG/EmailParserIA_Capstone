@@ -42,6 +42,7 @@ Saludos,\nDavid`
         />
         <div className="acciones">
           <button className="btn" onClick={() => navegar(-1)}>Atrás</button>
+          <button className="btn secundario" onClick={() => navegar(-1)}>Generar otra respuesta</button>
           <button className="btn primario" onClick={() => alert('Enviado (demo) ✅')}>Enviar</button>
         </div>
       </div>

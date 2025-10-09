@@ -1,0 +1,198 @@
+from email.utils import parsedate_to_datetime
+from bs4 import BeautifulSoup
+from fastapi.responses import RedirectResponse
+from googleapiclient.discovery import build
+from utils.correos import manejo_credenciales
+from utils import (
+    extraer_encabezados,
+    extraer_asunto,
+    extraer_remitente,
+    procesar_payload,
+    extraer_fecha_correo,
+)
+from .token_service import cargar_credenciales
+
+
+def obtener_perfil(email: str):
+    """Función que obtiene el perfil del usuario Gmail"""
+    creds = cargar_credenciales(email=email)
+    if not creds:
+        return RedirectResponse(url="/")
+
+    service = build("gmail", "v1", credentials=creds)
+    profile = service.users().getProfile(userId="me").execute()
+    nombre_usuario = email.split("@")[0]
+    return {"profile": profile, "nombre_usuario": nombre_usuario}
+
+
+def obtener_nombre_real(email: str):
+    """Función que obtiene el nombre real del usuario Gmail"""
+    creds = manejo_credenciales(email)
+
+    # Construir servicio de People API
+    service = build("people", "v1", credentials=creds)
+
+    profile = (
+        service.people().get(resourceName="people/me", personFields="names").execute()
+    )
+
+    nombre_real = profile.get("names", [{}])[0].get("displayName", "")
+    return {"nombre_real": nombre_real}
+
+
+def obtener_correos_preview(
+    email: str,
+    limit: int = 20,
+    format_type: str = "metadata",
+    headers: list | None = None,
+) -> list:
+    """Retorna un preview de cada correo (como la lista de gmail)."""
+    if headers is None:
+        headers = ["From", "Subject", "Date"]
+
+    creds = manejo_credenciales(email)
+
+    service = build("gmail", "v1", credentials=creds)
+
+    results = (
+        service.users()
+        .messages()
+        .list(
+            userId="me",
+            labelIds=["INBOX"],
+            maxResults=limit,
+        )
+        .execute()
+    )
+    messages = results.get("messages", [])
+
+    correos = []
+    seen_ids = set()
+    for msg in messages:
+        if msg["id"] in seen_ids:
+            continue
+        seen_ids.add(msg["id"])
+
+        correo = (
+            service.users()
+            .messages()
+            .get(userId="me", id=msg["id"], format=format_type, metadataHeaders=headers)
+            .execute()
+        )
+
+        if format_type == "metadata":
+            correo_simplificado = {}
+
+            for h in headers:
+                valor = next(
+                    (
+                        item["value"]
+                        for item in correo["payload"]["headers"]
+                        if item["name"] == h
+                    ),
+                    "",
+                )
+                correo_simplificado[h.lower()] = valor
+
+            if "date" in correo_simplificado and correo_simplificado["date"]:
+                try:
+                    dt = parsedate_to_datetime(correo_simplificado["date"])
+                    correo_simplificado["date"] = dt.strftime("%d/%m/%Y %H:%M")
+                except ImportError:
+                    pass
+            if "from" in correo_simplificado and "<" in correo_simplificado["from"]:
+                nombre, mail = correo_simplificado["from"].split("<")
+                correo_simplificado["from_name"] = nombre.strip()
+            else:
+                correo_simplificado["from_name"] = correo_simplificado.get("from", "")
+            correo_simplificado["snippet"] = correo.get("snippet", "")
+            correo_simplificado["id"] = msg["id"]
+
+            labels = correo.get("labelIds", [])
+            correo_simplificado["leido"] = "UNREAD" not in labels
+
+            correos.append(correo_simplificado)
+        else:
+            correos.append(correo)
+    return correos
+
+
+def limpiar_html(html: str) -> str:
+    """Devuelve solo el contenido visible del body del HTML"""
+    soup = BeautifulSoup(html, "html.parser")
+
+    # eliminar head
+    if soup.head:
+        soup.head.decompose()
+
+    # eliminar estilos y scripts
+    for tag in soup(["style", "script"]):
+        tag.decompose()
+
+    # eliminar comentarios
+    for comment in soup.find_all(
+        string=lambda text: isinstance(text, type(soup.Comment))
+    ):
+        comment.extract()
+
+    # devolver solo el body si existe
+    if soup.body:
+        return str(soup.body)
+    return str(soup)
+
+
+def correo_completo(email: str, mensaje_id: str) -> dict:
+    """Trae el correo completo según su ID y limpia HTML pesado"""
+    creds = manejo_credenciales(email)
+    service = build("gmail", "v1", credentials=creds)
+    correo = (
+        service.users()
+        .messages()
+        .get(userId="me", id=mensaje_id, format="full")
+        .execute()
+    )
+
+    payload = correo.get("payload", {})
+    headers = extraer_encabezados(payload)
+    asunto = extraer_asunto(headers)
+    remitente = extraer_remitente(headers)
+    fecha = extraer_fecha_correo(headers)
+
+    body_text, body_html, attachments = procesar_payload(payload, service, mensaje_id)
+
+    # Si no hay texto plano, crearlo a partir del HTML
+    if not body_text and body_html:
+        body_text = BeautifulSoup(body_html, "html.parser").get_text("\n", strip=True)
+
+    # Limpiar HTML antes de enviarlo
+    if body_html:
+        body_html = limpiar_html(body_html)
+
+    return {
+        "from": remitente,
+        "subject": asunto,
+        "date": fecha,
+        "body_text": body_text,
+        "body_html": body_html,
+        "attachments": attachments,
+    }
+
+
+def marcar_correo_leido(email: str, mensaje_id: str):
+    """Función que marca un correo como leído (quita la etiqueta UNREAD)"""
+    creds = manejo_credenciales(email)
+    service = build("gmail", "v1", credentials=creds)
+    service.users().messages().modify(
+        userId="me", id=mensaje_id, body={"removeLabelIds": ["UNREAD"]}
+    ).execute()
+
+    return {"ok": True, "mensaje_id": mensaje_id}
+
+
+def eliminar_correo(email: str, mensaje_id: str):
+    """Función que permite eliminar un correo de la bandeja"""
+    creds = manejo_credenciales(email)
+    service = build("gmail", "v1", credentials=creds)
+    service.users().messages().trash(userId="me", id=mensaje_id).execute()
+
+    return {"ok": True, "mensaje_id": mensaje_id}

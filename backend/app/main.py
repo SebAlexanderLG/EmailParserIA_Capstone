@@ -1,11 +1,19 @@
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
-from services.authentication import autorizacion_gmail
+from fastapi.middleware.cors import CORSMiddleware
+from core.config import origins
+from routers import auth_router, gmail_router, test_router
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.get("/")
-def autenticacion():
-    authorization_url = autorizacion_gmail()
-    return RedirectResponse(url=authorization_url)
+
+app.include_router(auth_router.router)
+app.include_router(gmail_router.router)
+app.include_router(test_router.router)
