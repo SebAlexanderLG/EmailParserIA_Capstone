@@ -1,0 +1,133 @@
+/* Contenedor principal */
+.detalle {
+  min-height: 100vh;
+  background: #eef3ff;
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* top aligned */
+  padding-top: 40px; /* espacio superior */
+}
+
+/* Caja del correo */
+.box {
+  width: min(900px, 95vw);
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* Encabezado */
+h2 {
+  margin: 0 0 12px 0;
+  font-size: 1.8rem;
+  color: #1e293b;
+}
+
+/* Información del correo (remitente, fecha) */
+.box p {
+  margin: 4px 0;
+  font-size: 0.95rem;
+  color: #475569;
+}
+
+/* Cuerpo del correo en texto plano */
+.mensaje {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  margin-top: 16px;
+  max-height: 500px;
+}
+
+/* Cuerpo del correo en HTML */
+.mensaje div {
+  max-height: 500px;
+  overflow: auto;
+}
+
+/* Botones */
+.acciones {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn {
+  padding: 10px 16px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  background: #f1f5f9;
+}
+
+.primario {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+}
+
+.primario:hover {
+  background: #c7d2fe;
+}
+
+/* === ESTILOS PARA CARGANDO CORREO === */
+.loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-radius: 12px;
+  padding: 40px 60px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.loading-box p {
+  margin-top: 16px;
+  font-size: 1.1rem;
+  color: #475569;
+}
+
+/* Spinner animado */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #cbd5e1;
+  border-top-color: #64748b;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+
+/* .detalle{ min-height:100vh; background:#eef3ff; padding:16px; display:grid; place-items:center }
+/* .box{
+/*   width:min(900px, 95vw);
+/*   background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:20px;
+/* }
+/* h2{ margin:0 0 8px 0 }
+/* .mensaje{
+/*   background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px;
+/*   padding:12px; white-space:pre-wrap;
+/* }
+/* .acciones{ display:flex; gap:10px; margin-top:12px }
+/* .btn{
+/*   padding:10px 14px; border:1px solid #cbd5e1; background:#fff; border-radius:8px; cursor:pointer
+/* }
+/* .primario{ background:#e0e7ff; border-color:#a5b4fc }
