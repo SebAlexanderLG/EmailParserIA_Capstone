@@ -104,3 +104,19 @@ export async function eliminarCorreo(mensajeId) {
 
   return await res.json();
 }
+
+export async function enviarCorreoRespuesta({ mensaje_id, respuesta_texto }) {
+  const response = await fetch(`${API_URL}/gmail/enviar_respuesta`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mensaje_id, respuesta_texto }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Error enviando correo");
+  }
+
+  return await response.json();
+}
