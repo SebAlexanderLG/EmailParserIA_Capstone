@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Request, HTTPException
 from fastapi import Body
+from app.database import SessionLocal
 from fastapi.responses import JSONResponse
+from models.email import Email
+from datetime import datetime
 from utils.correos import descargar_adjunto_gmail
 from services.gmail_service import (
     obtener_nombre_real,
@@ -8,6 +11,8 @@ from services.gmail_service import (
     correo_completo,
     marcar_correo_leido,
     eliminar_correo,
+    registrar_correo_en_bd,
+    enviar_respuesta_correo,
 )
 
 router = APIRouter(prefix="/gmail", tags=["Gmail"])
@@ -39,11 +44,25 @@ def correos_preview(request: Request, body: dict = Body(...)):
 @router.get("/correos")
 def correos(mensaje_id: str, request: Request):
     """Endpoint que trae correo completo"""
-    # Leer email desde la cookie HttpOnly enviada en el request
     email = request.cookies.get("email")
     if not email:
         raise HTTPException(status_code=401, detail="No se encontró el email")
-    return correo_completo(email=email, mensaje_id=mensaje_id)
+
+    # ✅ Obtener el correo desde Gmail API
+    correo = correo_completo(email=email, mensaje_id=mensaje_id)
+
+    # ✅ Guardar en BD solo si es la primera vez que se abre
+    db = SessionLocal()
+    try:
+        registrar_correo_en_bd(email, correo, mensaje_id, db)
+        db.commit()
+    except Exception as e:
+        print(f"[WARN] No se pudo registrar el correo {mensaje_id}: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+    return correo
 
 
 @router.get("/descargar_adjunto")
@@ -96,3 +115,44 @@ def logout():
     response = JSONResponse({"ok": True})
     response.delete_cookie("email", path="/")
     return response
+
+
+@router.post("/enviar_respuesta")
+def enviar_respuesta(request: Request, body: dict = Body(...)):
+    """Envía un correo de respuesta y guarda la fecha de envío + respuesta IA"""
+    email_cookie = request.cookies.get("email")
+    if not email_cookie:
+        raise HTTPException(status_code=401, detail="No autenticado")
+
+    mensaje_id = body.get("mensaje_id")
+    respuesta_texto = body.get("respuesta_texto")
+
+    if not mensaje_id or not respuesta_texto:
+        raise HTTPException(
+            status_code=400, detail="Faltan parámetros: mensaje_id o respuesta_texto."
+        )
+
+    db = SessionLocal()
+    try:
+        # 1️⃣ Enviar el correo usando la API de Gmail
+        enviar_respuesta_correo(email_cookie, mensaje_id, respuesta_texto)
+
+        # 2️⃣ Guardar en la BD
+        email_db = db.query(Email).filter(Email.email_id == mensaje_id).first()
+        if not email_db:
+            raise HTTPException(status_code=404, detail="Correo no encontrado en BD")
+
+        email_db.respuesta_ia = respuesta_texto
+        email_db.fecha_envio = datetime.now()
+
+        db.commit()
+
+        return {
+            "ok": True,
+            "fecha_envio": email_db.fecha_envio.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()

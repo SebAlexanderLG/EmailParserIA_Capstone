@@ -1,5 +1,13 @@
 from email.utils import parsedate_to_datetime
 from bs4 import BeautifulSoup
+from sqlalchemy.orm import Session
+from datetime import datetime
+import re
+from email.mime.text import MIMEText
+from models.email import Email
+import base64
+from models.remitente import Remitente
+from models.usuario import Usuario
 from fastapi.responses import RedirectResponse
 from googleapiclient.discovery import build
 from utils.correos import manejo_credenciales
@@ -117,6 +125,61 @@ def obtener_correos_preview(
     return correos
 
 
+def registrar_correo_en_bd(
+    email_cookie: str, correo: dict, mensaje_id: str, db: Session
+):
+    """Registra un correo en la BD si no existe, creando remitente si es necesario."""
+
+    # Evitar duplicados
+    if db.query(Email).filter(Email.email_id == mensaje_id).first():
+        return
+
+    remitente_str = correo.get("from", "") or correo.get("from_name", "")
+    asunto = correo.get("subject", "") or correo.get("asunto", "")
+    cuerpo_snippet = correo.get("snippet", "")[:500]
+    fecha_hora = datetime.now()
+
+    # ✅ Buscar destinatario (usuario autenticado)
+    usuario_dest = db.query(Usuario).filter(Usuario.email == email_cookie).first()
+    if not usuario_dest:
+        raise Exception("Usuario autenticado no encontrado en la base de datos.")
+
+    # ✅ Buscar o crear remitente
+    remitente_db = (
+        db.query(Remitente)
+        .filter(
+            Remitente.nombre_correo == remitente_str,
+            Remitente.usuario_id == usuario_dest.id,
+        )
+        .first()
+    )
+    if not remitente_db:
+        remitente_db = Remitente(
+            usuario_id=usuario_dest.id,
+            nombre_correo=remitente_str,
+            nombre_remitente=None,
+        )
+        db.add(remitente_db)
+        db.commit()
+        db.refresh(remitente_db)
+
+    # ✅ Crear registro de correo
+    nuevo_email = Email(
+        fecha_hora_correo=fecha_hora,
+        email_id=mensaje_id,
+        remitente_id=remitente_db.id,
+        destinatario_id=usuario_dest.id,
+        asunto=asunto,
+        cuerpo_snippet=cuerpo_snippet,
+    )
+
+    db.add(nuevo_email)
+    db.commit()
+    db.refresh(nuevo_email)
+
+    print(f"[INFO] Correo {mensaje_id} registrado en la BD.")
+
+
 def limpiar_html(html: str) -> str:
     """Devuelve solo el contenido visible del body del HTML"""
     soup = BeautifulSoup(html, "html.parser")
@@ -196,3 +259,57 @@ def eliminar_correo(email: str, mensaje_id: str):
     service.users().messages().trash(userId="me", id=mensaje_id).execute()
 
     return {"ok": True, "mensaje_id": mensaje_id}
+
+
+def enviar_respuesta_correo(email_usuario: str, mensaje_id: str, cuerpo_respuesta: str):
+    """Envía una respuesta al correo original usando Gmail API"""
+    try:
+        creds = manejo_credenciales(email_usuario)
+        service = build("gmail", "v1", credentials=creds)
+
+        # 🔹 Obtener el correo original (solo metadata)
+        mensaje_original = (
+            service.users()
+            .messages()
+            .get(userId="me", id=mensaje_id, format="metadata")
+            .execute()
+        )
+
+        headers = mensaje_original.get("payload", {}).get("headers", [])
+        subject = next(
+            (h["value"] for h in headers if h["name"] == "Subject"), "(sin asunto)"
+        )
+        remitente_raw = next((h["value"] for h in headers if h["name"] == "From"), None)
+        message_id_header = next(
+            (h["value"] for h in headers if h["name"].lower() == "message-id"), None
+        )
+
+        if not remitente_raw:
+            raise Exception("No se encontró el remitente del correo original.")
+
+        # ✅ Limpiar y extraer solo el correo electrónico
+        match = re.search(r"<(.+?)>", remitente_raw)
+        remitente = match.group(1) if match else remitente_raw.strip()
+
+        # 🔹 Crear mensaje MIME (UTF-8)
+        mensaje = MIMEText(cuerpo_respuesta, "plain", "utf-8")
+        mensaje["to"] = remitente
+        mensaje["subject"] = f"Re: {subject}"
+
+        # 🔹 Mantener el hilo original (si tiene Message-ID)
+        if message_id_header:
+            mensaje["In-Reply-To"] = message_id_header
+            mensaje["References"] = message_id_header
+
+        # 🔹 Codificar mensaje (Base64 URL-safe)
+        raw = base64.urlsafe_b64encode(mensaje.as_bytes()).decode("utf-8")
+
+        # 🔹 Enviar el correo
+        service.users().messages().send(userId="me", body={"raw": raw}).execute()
+
+        print(f"[INFO] ✅ Respuesta enviada correctamente a {remitente}")
+        return True
+
+    except Exception as e:
+        print(f"[ERROR] Fallo al enviar correo: {e}")
+        raise Exception(f"No se pudo enviar el correo: {e}")

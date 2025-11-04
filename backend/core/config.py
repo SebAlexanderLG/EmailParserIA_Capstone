@@ -16,7 +16,10 @@ DATABASE_URL_CONECTION = "postgresql://postgres:1234@localhost:5432/parser"
 
 origins = ["http://localhost:5173"]
 
-prompt = {
-    "model": "llama3",
-    "prompt": "Analiza el correo y dime de que trata",
+OLLAMA_URL_TEST = "http://localhost:11434/api/tags"
+OLLAMA_URL = "http://localhost:11434/api/generate"
+TIMEOUT = 120
+PROMPT = {
+    "resumen_correo": "Resume este correo en 3 lineas",
+    "respuesta_ia": "Analiza el correo y genera una respuesta logica y coherente en base al mensaje recibido y representando, en primera persona al docente a quien recibe el correo.",
 }
