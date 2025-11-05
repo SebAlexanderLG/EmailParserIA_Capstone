@@ -5,7 +5,7 @@ from core.config import PROMPT, TIMEOUT, OLLAMA_URL, OLLAMA_URL_TEST
 def probar_conexion_ollama():
     """Verifica que el servidor de Ollama esté corriendo."""
     try:
-        response = requests.get(OLLAMA_URL_TEST)
+        response = requests.get(OLLAMA_URL_TEST, timeout=10)
         if response.status_code == 200:
             modelos = [m["name"] for m in response.json().get("models", [])]
             return {"ok": True, "modelos_disponibles": modelos}
@@ -19,6 +19,7 @@ def probar_conexion_ollama():
 
 
 def generar_respuesta_ollama(prompt: str, cuerpo_correo: str):
+    """Lee un prompt y genera una respuesta"""
     prompt_usuario = PROMPT.get(prompt)
     if not prompt_usuario:
         raise ValueError(f"No se encontro el prompt: {prompt}")
@@ -32,5 +33,5 @@ def generar_respuesta_ollama(prompt: str, cuerpo_correo: str):
     )
 
     if response.status_code != 200:
-        raise Exception(f"Error en Ollama: {response.text}")
+        raise ValueError(f"Error en Ollama: {response.text}")
     return response.json().get("response", "")

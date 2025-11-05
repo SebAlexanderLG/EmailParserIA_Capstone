@@ -1,9 +1,9 @@
+from datetime import datetime
 from fastapi import APIRouter, Request, HTTPException
 from fastapi import Body
-from app.database import SessionLocal
 from fastapi.responses import JSONResponse
 from models.email import Email
-from datetime import datetime
+from app.database import SessionLocal
 from utils.correos import descargar_adjunto_gmail
 from services.gmail_service import (
     obtener_nombre_real,
@@ -56,7 +56,7 @@ def correos(mensaje_id: str, request: Request):
     try:
         registrar_correo_en_bd(email, correo, mensaje_id, db)
         db.commit()
-    except Exception as e:
+    except ImportError as e:
         print(f"[WARN] No se pudo registrar el correo {mensaje_id}: {e}")
         db.rollback()
     finally:
@@ -98,6 +98,7 @@ def marcar_leido(request: Request, body: dict = Body(...)):
 
 @router.delete("/eliminar_correo")
 def eliminar_correo_gmail(request: Request, body: dict = Body(...)):
+    """Función que elimina correo de buzón"""
     email = request.cookies.get("email")
     if not email:
         raise HTTPException(status_code=4001, detail="No autenticado")
@@ -134,10 +135,10 @@ def enviar_respuesta(request: Request, body: dict = Body(...)):
 
     db = SessionLocal()
     try:
-        # 1️⃣ Enviar el correo usando la API de Gmail
+        # Envia el mensaje del correo usando Gmail API
         enviar_respuesta_correo(email_cookie, mensaje_id, respuesta_texto)
 
-        # 2️⃣ Guardar en la BD
+        # Guarda mensaje en la BD
         email_db = db.query(Email).filter(Email.email_id == mensaje_id).first()
         if not email_db:
             raise HTTPException(status_code=404, detail="Correo no encontrado en BD")
@@ -153,6 +154,6 @@ def enviar_respuesta(request: Request, body: dict = Body(...)):
         }
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500) from e
     finally:
         db.close()

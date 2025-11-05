@@ -9,6 +9,7 @@ from services.token_service import cargar_credenciales
 def descargar_adjunto_gmail(
     email: str, mensaje_id: str, attachment_id: str, filename: str = None
 ):
+    """Función que permite descargar archivos adjuntos que esten en un correo."""
     creds = cargar_credenciales(email=email)
     if not creds:
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
@@ -30,7 +31,7 @@ def descargar_adjunto_gmail(
         contenido = urlsafe_b64decode(data)
         archivo = BytesIO(contenido)
 
-        # ✅ Nombre del archivo (si no lo pasan, usar genérico)
+        # Nombre del archivo (si no lo pasan, usar genérico)
         nombre_archivo = filename or f"archivo_{attachment_id}.bin"
 
         return StreamingResponse(
@@ -43,6 +44,7 @@ def descargar_adjunto_gmail(
 
 
 def manejo_credenciales(email: str):
+    """Función que recibe credenciales para que sean cargadas."""
     creds = cargar_credenciales(email=email)
     if not creds:
         raise HTTPException(status_code=401, detail="Credenciales inválidas")

@@ -17,6 +17,7 @@ def test_ollama():
 
 @router.post("/generar_respuesta_ia")
 def generar_respuesta_ia(request: Request, body: dict = Body(...)):
+    """Endpoint que recibe cuerpo del correo y genera una respuesta IA"""
     email = request.cookies.get("email")
     if not email:
         raise HTTPException(status_code=401, detail="No autenticado")
@@ -40,6 +41,6 @@ def generar_respuesta_ia(request: Request, body: dict = Body(...)):
     try:
         respuesta_ia = generar_respuesta_ollama(prompt_key, cuerpo_correo)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500) from e
 
     return {"respuesta": respuesta_ia}

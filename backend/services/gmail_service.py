@@ -128,9 +128,9 @@ def obtener_correos_preview(
 def registrar_correo_en_bd(
     email_cookie: str, correo: dict, mensaje_id: str, db: Session
 ):
-    """Registra un correo en la BD si no existe, creando remitente si es necesario."""
+    """Registra un correo en la BD si no existe y agrega a remitente si es necesario."""
 
-    # Evitar duplicados
+    # Evita duplicados en consulta
     if db.query(Email).filter(Email.email_id == mensaje_id).first():
         return
 
@@ -139,12 +139,12 @@ def registrar_correo_en_bd(
     cuerpo_snippet = correo.get("snippet", "")[:500]
     fecha_hora = datetime.now()
 
-    # ✅ Buscar destinatario (usuario autenticado)
+    # Buscar destinatario (usuario autenticado)
     usuario_dest = db.query(Usuario).filter(Usuario.email == email_cookie).first()
     if not usuario_dest:
-        raise Exception("Usuario autenticado no encontrado en la base de datos.")
+        raise ValueError("Usuario autenticado no encontrado en la base de datos.")
 
-    # ✅ Buscar o crear remitente
+    # Buscar si hay un remitente, si no, lo agrega a la BD
     remitente_db = (
         db.query(Remitente)
         .filter(
@@ -163,7 +163,7 @@ def registrar_correo_en_bd(
         db.commit()
         db.refresh(remitente_db)
 
-    # ✅ Crear registro de correo
+    # Inserta campos del correo
     nuevo_email = Email(
         fecha_hora_correo=fecha_hora,
         email_id=mensaje_id,
@@ -227,7 +227,7 @@ def correo_completo(email: str, mensaje_id: str) -> dict:
     if not body_text and body_html:
         body_text = BeautifulSoup(body_html, "html.parser").get_text("\n", strip=True)
 
-    # Limpiar HTML antes de enviarlo
+    # Limpia HTML antes de enviarlo
     if body_html:
         body_html = limpiar_html(body_html)
 
@@ -285,7 +285,7 @@ def enviar_respuesta_correo(email_usuario: str, mensaje_id: str, cuerpo_respuest
         )
 
         if not remitente_raw:
-            raise Exception("No se encontró el remitente del correo original.")
+            raise ValueError("No se encontró el remitente del correo original.")
 
         # ✅ Limpiar y extraer solo el correo electrónico
         match = re.search(r"<(.+?)>", remitente_raw)
@@ -312,4 +312,4 @@ def enviar_respuesta_correo(email_usuario: str, mensaje_id: str, cuerpo_respuest
 
     except Exception as e:
         print(f"[ERROR] Fallo al enviar correo: {e}")
-        raise Exception(f"No se pudo enviar el correo: {e}")
+        raise ValueError("No se pudo enviar el correo.") from e
