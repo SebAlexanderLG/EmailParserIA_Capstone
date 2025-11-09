@@ -14,7 +14,7 @@ export default function RespuestaCorreo() {
   const [loadingIA, setLoadingIA] = useState(false);
   const [error, setError] = useState("");
 
-  // 🔹 1. Cargar el correo original
+  // Carga el correo original
   useEffect(() => {
     setLoadingCorreo(true);
     obtenerCorreoCompleto(id)
@@ -23,7 +23,7 @@ export default function RespuestaCorreo() {
       .finally(() => setLoadingCorreo(false));
   }, [id]);
 
-  // 🔹 2. Generar respuesta IA
+  // Genera respuesta IA
   const handleGenerar = async () => {
     setLoadingIA(true);
     try {
@@ -40,7 +40,7 @@ export default function RespuestaCorreo() {
     }
   };
 
-  // 🔹 3. Mostrar distintos estados de carga
+  // Muestra distintos estados de carga
   if (loadingCorreo)
     return (
       <main className="detalle">

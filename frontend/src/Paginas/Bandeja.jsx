@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { obtenerPerfil, obtenerCorreos, marcarComoLeido, eliminarCorreo } from "../api/gmail";
+import {
+  obtenerPerfil,
+  obtenerCorreos,
+  marcarComoLeido,
+  eliminarCorreo,
+} from "../api/gmail";
+import { guardarPromptIA } from "../api/prompt";
 import "./Bandeja.css";
 
 export default function Bandeja() {
@@ -9,10 +15,16 @@ export default function Bandeja() {
   const [correos, setCorreos] = useState([]);
   const [nombreUsuario, setNombreUsuario] = useState("");
   const [loading, setLoading] = useState(true);
-  const [correoAEliminar, setCorreoAEliminar] = useState(null); // ✅ Estado para el modal
+  const [correoAEliminar, setCorreoAEliminar] = useState(null);
+  const [mostrarModalPrompt, setMostrarModalPrompt] = useState(false);
+  const [promptIA, setPromptIA] = useState(
+    localStorage.getItem("prompt_ia") ||
+      "Por favor, redacta una respuesta profesional y cordial al siguiente correo."
+  );
+
   const navegar = useNavigate();
 
-  // Cargar perfil y correos
+  // Carga perfil y correos
   useEffect(() => {
     const cargarDatos = async () => {
       try {
@@ -37,7 +49,7 @@ export default function Bandeja() {
     cargarDatos();
   }, [navegar]);
 
-  // Filtrar lista según tab y búsqueda
+  // Filtra correos por "Leidos" y "No Leidos"
   const lista = useMemo(() => {
     const base = correos.filter((c) => (tab === "leidos" ? c.leido : !c.leido));
     const term = q.trim().toLowerCase();
@@ -49,32 +61,51 @@ export default function Bandeja() {
     );
   }, [tab, q, correos]);
 
-  const cerrarSesion = () => navegar("/");
+  // Permite abrir un correo
+  const handleAbrirCorreo = async (c) => {
+    navegar(`/correo/${c.id}`);
+    if (!c.leido) {
+      try {
+        await marcarComoLeido(c.id);
+        setCorreos((prev) =>
+          prev.map((x) => (x.id === c.id ? { ...x, leido: true } : x))
+        );
+        setTab("leidos");
+      } catch (err) {
+        console.error("Error marcando como leído:", err);
+      }
+    }
+  };
 
+  // Confirma eliminación de correo
   const handleEliminarConfirmado = async () => {
     if (!correoAEliminar) return;
     try {
       await eliminarCorreo(correoAEliminar.id);
-      setCorreos(prev => prev.filter(c => c.id !== correoAEliminar.id));
-      setCorreoAEliminar(null); // cerrar modal
+      setCorreos((prev) => prev.filter((c) => c.id !== correoAEliminar.id));
+      setCorreoAEliminar(null);
     } catch (err) {
       console.error("Error eliminando correo:", err);
       alert("No se pudo eliminar el correo.");
     }
   };
 
-  const handleAbrirCorreo = async (c) => {
-    navegar(`/correo/${c.id}`);
-    if (!c.leido) {
-      try {
-        await marcarComoLeido(c.id);
-        setCorreos(prev =>
-          prev.map(x => (x.id === c.id ? { ...x, leido: true } : x))
-        );
-        setTab("leidos");
-      } catch (err) {
-        console.error("Error marcando como leído:", err);
-      }
+  const cerrarSesion = () => navegar("/");
+
+  // Guarda prompt en BD
+  const handleGuardarPrompt = async () => {
+    try {
+      // Guarda en localStorage
+      localStorage.setItem("prompt_ia", promptIA);
+
+      // Guarda en base de datos
+      const res = await guardarPromptIA(promptIA);
+      alert(res.mensaje || "✅ Parámetros de IA actualizados correctamente.");
+
+      setMostrarModalPrompt(false);
+    } catch (err) {
+      console.error("Error guardando el prompt:", err);
+      alert("❌ No se pudo guardar el prompt en la base de datos.");
     }
   };
 
@@ -84,14 +115,17 @@ export default function Bandeja() {
         <h2>📬 Bandeja</h2>
         <input
           className="buscar"
-          placeholder="Buscar..."
+          placeholder="Buscar correo..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
         <div className="usuario">
           <span>{nombreUsuario}</span>
-          <button onClick={cerrarSesion} className="btn-cerrar">Cerrar sesión</button>
+          <button onClick={cerrarSesion} className="btn-cerrar">
+            Cerrar sesión
+          </button>
         </div>
+
         <div className="tabs">
           <button
             className={`tab ${tab === "no-leidos" ? "activa" : ""}`}
@@ -106,8 +140,14 @@ export default function Bandeja() {
             Leídos
           </button>
         </div>
+
         <div className="prompts">
-          <button className="prompt" onClick={() => {}}>Cambiar parámetros de IA</button>
+          <button
+            className="prompt"
+            onClick={() => setMostrarModalPrompt(true)}
+          >
+            Cambiar parámetros de IA
+          </button>
         </div>
       </header>
 
@@ -135,13 +175,15 @@ export default function Bandeja() {
                   <td onClick={() => handleAbrirCorreo(c)}>{c.date}</td>
                   <td onClick={() => handleAbrirCorreo(c)}>{c.from_name}</td>
                   <td onClick={() => handleAbrirCorreo(c)}>{c.subject}</td>
-                  <td className="msg" onClick={() => handleAbrirCorreo(c)}>{c.snippet}</td>
+                  <td className="msg" onClick={() => handleAbrirCorreo(c)}>
+                    {c.snippet}
+                  </td>
                   <td>
                     <button
                       className="btn-menu"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setCorreoAEliminar(c); // ✅ Abre modal en lugar de confirmar directo
+                        setCorreoAEliminar(c);
                       }}
                     >
                       ⋮
@@ -151,17 +193,23 @@ export default function Bandeja() {
               ))}
               {lista.length === 0 && (
                 <tr>
-                  <td colSpan="5" className="vacio">Sin resultados</td>
+                  <td colSpan="5" className="vacio">
+                    Sin resultados
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         )}
       </section>
+
+      {/* Modal para eliminar un correo */}
       {correoAEliminar && (
         <div className="modal-overlay">
           <div className="modal">
-            <p>¿Eliminar el correo de <strong>{correoAEliminar.from_name}</strong>?</p>
+            <p>
+              ¿Eliminar el correo de <strong>{correoAEliminar.from_name}</strong>?
+            </p>
             <p className="modal-subject">{correoAEliminar.subject}</p>
             <div className="modal-actions">
               <button
@@ -170,11 +218,34 @@ export default function Bandeja() {
               >
                 Cancelar
               </button>
-              <button
-                className="btn-confirm"
-                onClick={handleEliminarConfirmado}
-              >
+              <button className="btn-confirm" onClick={handleEliminarConfirmado}>
                 Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para cambiar el prompt */}
+      {mostrarModalPrompt && (
+        <div className="modal-overlay">
+          <div className="modal">
+            <h3>🧠 Parámetros de IA</h3>
+            <p>Define cómo deseas que la IA redacte las respuestas:</p>
+            <textarea
+              className="prompt-textarea"
+              value={promptIA}
+              onChange={(e) => setPromptIA(e.target.value)}
+            />
+            <div className="modal-actions">
+              <button
+                className="btn-cancel"
+                onClick={() => setMostrarModalPrompt(false)}
+              >
+                Cancelar
+              </button>
+              <button className="btn-confirm" onClick={handleGuardarPrompt}>
+                Guardar
               </button>
             </div>
           </div>

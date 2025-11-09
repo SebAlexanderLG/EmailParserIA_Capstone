@@ -14,7 +14,7 @@ export const obtenerCorreos = async (limit = 10, formato = "metadata") => {
   const response = await fetch(`${API_URL}/gmail/correosPreview`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    credentials: "include", // 👈 también envía la cookie
+    credentials: "include", //
     body: JSON.stringify({ limit, formato }),
   });
   return response.json();
@@ -33,7 +33,7 @@ export async function cerrarSesion() {
 export async function obtenerCorreoCompleto(id) {
   const res = await fetch(`${API_URL}/gmail/correos?mensaje_id=${id}`, {
     method: "GET",
-    credentials: "include", // importante para enviar cookies HttpOnly
+    credentials: "include",
   });
 
   if (!res.ok) {
@@ -69,7 +69,7 @@ export async function descargarAdjunto(mensajeId, attachmentId, filename) {
   document.body.removeChild(link);
 }
 
-/*Función para marcar correos leidos */
+/* Función para marcar correos leidos */
 
 export async function marcarComoLeido(mensajeId) {
   const res = await fetch(`${API_URL}/gmail/marcar_leido`, {

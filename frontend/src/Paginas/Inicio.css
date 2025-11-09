@@ -42,9 +42,9 @@
   background:#c7d2fe
 }
 .logoGmail {
-  width: 20px;        /* tamaño del logo */
+  width: 20px;        
   height: 15px;
   margin-left: 10px;
-  margin-bottom: 1px;  /* espacio entre logo y texto */
+  margin-bottom: 1px; 
   vertical-align: middle;
 }

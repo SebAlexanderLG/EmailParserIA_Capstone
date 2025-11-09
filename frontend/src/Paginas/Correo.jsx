@@ -4,28 +4,29 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   obtenerCorreoCompleto,
   descargarAdjunto,
-  enviarCorreoRespuesta, // 👈 agregado
+  enviarCorreoRespuesta,
 } from "../api/gmail";
-import { generarRespuestaOllama } from "../api/ollama"; // 👈 agregado
+import { generarRespuestaOllama } from "../api/ollama";
 import "./Correo.css";
 
 export default function DetalleCorreo() {
   const { id } = useParams();
   const navegar = useNavigate();
+
+  // Estados principales
   const [correo, setCorreo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // 🔹 Estados nuevos para IA
+  // Estados para IA
   const [loadingIA, setLoadingIA] = useState(false);
   const [respuestaIA, setRespuestaIA] = useState("");
   const [enviando, setEnviando] = useState(false);
 
-  // 📩 Cargar correo al abrir
+  // Carga correo completo al abrir
   useEffect(() => {
     setLoading(true);
     setError("");
-
     obtenerCorreoCompleto(id)
       .then((data) => setCorreo(data))
       .catch((err) => {
@@ -35,31 +36,38 @@ export default function DetalleCorreo() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // 🧠 Generar respuesta con Ollama
+  // Genera respuesta con Ollama (usando prompt personalizado)
   const handleGenerarIA = async () => {
     setLoadingIA(true);
     setRespuestaIA("");
+
+    // Lee el prompt personalizado guardado por el usuario
+    const promptUsuario =
+      localStorage.getItem("prompt_ia") ||
+      "Por favor, redacta una respuesta profesional y cordial al siguiente correo:";
+
     try {
       const data = await generarRespuestaOllama({
         mensaje_id: id,
-        prompt_key: "respuesta_ia",
+        prompt_key: promptUsuario, // texto por defecto
       });
+
       setRespuestaIA(data.respuesta || "Sin respuesta generada por la IA.");
     } catch (err) {
-      console.error(err);
+      console.error("Error generando respuesta IA:", err);
       setError("Error generando respuesta IA.");
     } finally {
       setLoadingIA(false);
     }
   };
 
-  // 🔁 Regenerar respuesta IA
+  // Regenera respuesta IA
   const handleRegenerar = () => {
     setRespuestaIA("");
     handleGenerarIA();
   };
 
-  // 📤 Enviar correo al remitente (ya con respuesta IA)
+  // Enviar correo al remitente (guarda respuesta y fecha en BD)
   const handleEnviar = async () => {
     if (!respuestaIA.trim()) {
       alert("La respuesta no puede estar vacía.");
@@ -73,11 +81,7 @@ export default function DetalleCorreo() {
         respuesta_texto: respuestaIA,
       });
 
-      alert(
-        `📨 Correo enviado correctamente.\nFecha de envío: ${res.fecha_envio}`
-      );
-
-      // ✅ Limpiar y volver a la bandeja
+      alert(`📨 Correo enviado correctamente.\nFecha de envío: ${res.fecha_envio}`);
       setRespuestaIA("");
       navegar("/bandeja");
     } catch (err) {
@@ -88,7 +92,7 @@ export default function DetalleCorreo() {
     }
   };
 
-  // 🌀 Estado de carga del correo
+  // Estado de carga inicial
   if (loading)
     return (
       <main className="detalle">
@@ -99,7 +103,7 @@ export default function DetalleCorreo() {
       </main>
     );
 
-  // ❌ Estado de error
+  // Estado de error
   if (error || !correo)
     return (
       <main className="detalle">
@@ -112,7 +116,7 @@ export default function DetalleCorreo() {
       </main>
     );
 
-  // ✅ Render principal
+  // Render principal
   return (
     <main className="detalle">
       <div className="box">
@@ -152,7 +156,7 @@ export default function DetalleCorreo() {
 
         <hr />
 
-        {/* 🔹 Si todavía no hay respuesta */}
+        {/* Si aún no hay respuesta generada */}
         {!respuestaIA && !loadingIA && (
           <div className="acciones">
             <button className="btn" onClick={() => navegar("/bandeja")}>
@@ -164,7 +168,6 @@ export default function DetalleCorreo() {
           </div>
         )}
 
-        {/* 🔹 Mientras se genera la respuesta */}
         {loadingIA && (
           <div className="loading-box">
             <div className="spinner"></div>
@@ -172,12 +175,11 @@ export default function DetalleCorreo() {
           </div>
         )}
 
-        {/* 🔹 Si ya se generó la respuesta (editable) */}
+        {/* Si ya se generó la respuesta (campo editable antes de enviar) */}
         {respuestaIA && !loadingIA && (
           <div className="respuesta-ia-box">
             <h3>Respuesta generada por IA:</h3>
 
-            {/* 🔹 Campo editable */}
             <textarea
               className="respuesta-ia-editable"
               value={respuestaIA}
@@ -197,7 +199,7 @@ export default function DetalleCorreo() {
                 onClick={handleEnviar}
                 disabled={enviando}
               >
-                {enviando ? "Enviando..." : "Enviar correo"}
+                {enviando ? "Enviando mensaje..." : "Enviar correo"}
               </button>
             </div>
           </div>
