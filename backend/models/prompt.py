@@ -3,7 +3,6 @@ import sqlalchemy as sa
 import sqlalchemy.orm as so
 
 from models.db_model import Base
-from models.usuario import Usuario
 
 
 class Prompt(Base):

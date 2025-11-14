@@ -4,8 +4,6 @@ import sqlalchemy.orm as so
 
 
 from models.db_model import Base
-from models.remitente import Remitente
-from models.usuario import Usuario
 
 
 class Email(Base):

@@ -4,10 +4,6 @@ import sqlalchemy as sa
 import sqlalchemy.orm as so
 
 from models.db_model import Base
-from models.email import Email
-from models.prompt import Prompt
-from models.remitente import Remitente
-from models.token import GmailToken
 
 
 class Usuario(Base):
