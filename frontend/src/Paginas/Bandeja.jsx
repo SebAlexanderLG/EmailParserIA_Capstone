@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { obtenerPerfil, obtenerCorreos, marcarComoLeido, eliminarCorreo } from "../api/gmail";
+import {
+  obtenerPerfil,
+  obtenerCorreos,
+  marcarComoLeido,
+  eliminarCorreo,
+} from "../api/gmail";
 import "./Bandeja.css";
 
 export default function Bandeja() {
@@ -9,33 +14,36 @@ export default function Bandeja() {
   const [correos, setCorreos] = useState([]);
   const [nombreUsuario, setNombreUsuario] = useState("");
   const [loading, setLoading] = useState(true);
-  const [correoAEliminar, setCorreoAEliminar] = useState(null); // ✅ Estado para el modal
+  const [correoAEliminar, setCorreoAEliminar] = useState(null);
   const navegar = useNavigate();
 
-  // Cargar perfil y correos
+  // Cargar perfil y correos (sin botar al inicio)
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const perfil = await obtenerPerfil();
-        if (perfil.error) {
-          navegar("/");
-          return;
-        }
-        setNombreUsuario(perfil.nombre_real);
-
         setLoading(true);
-        const correosData = await obtenerCorreos(50, "metadata");
+
+        const perfil = await obtenerPerfil().catch(() => null);
+        if (perfil && !perfil.error && perfil.nombre_real) {
+          setNombreUsuario(perfil.nombre_real);
+        } else {
+          setNombreUsuario("Usuario Demo");
+        }
+
+        const correosData = await obtenerCorreos(50, "metadata").catch(
+          () => []
+        );
         setCorreos(correosData);
       } catch (err) {
         console.error("Error cargando datos:", err);
-        navegar("/");
+        setNombreUsuario("Usuario Demo");
       } finally {
         setLoading(false);
       }
     };
 
     cargarDatos();
-  }, [navegar]);
+  }, []);
 
   // Filtrar lista según tab y búsqueda
   const lista = useMemo(() => {
@@ -55,8 +63,8 @@ export default function Bandeja() {
     if (!correoAEliminar) return;
     try {
       await eliminarCorreo(correoAEliminar.id);
-      setCorreos(prev => prev.filter(c => c.id !== correoAEliminar.id));
-      setCorreoAEliminar(null); // cerrar modal
+      setCorreos((prev) => prev.filter((c) => c.id !== correoAEliminar.id));
+      setCorreoAEliminar(null);
     } catch (err) {
       console.error("Error eliminando correo:", err);
       alert("No se pudo eliminar el correo.");
@@ -68,8 +76,8 @@ export default function Bandeja() {
     if (!c.leido) {
       try {
         await marcarComoLeido(c.id);
-        setCorreos(prev =>
-          prev.map(x => (x.id === c.id ? { ...x, leido: true } : x))
+        setCorreos((prev) =>
+          prev.map((x) => (x.id === c.id ? { ...x, leido: true } : x))
         );
         setTab("leidos");
       } catch (err) {
@@ -79,89 +87,131 @@ export default function Bandeja() {
   };
 
   return (
-    <main className="bandeja">
-      <header className="topbar">
-        <h2>📬 Bandeja</h2>
-        <input
-          className="buscar"
-          placeholder="Buscar..."
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <div className="usuario">
-          <span>{nombreUsuario}</span>
-          <button onClick={cerrarSesion} className="btn-cerrar">Cerrar sesión</button>
-        </div>
-        <div className="tabs">
-          <button
-            className={`tab ${tab === "no-leidos" ? "activa" : ""}`}
-            onClick={() => setTab("no-leidos")}
-          >
-            No leídos
-          </button>
-          <button
-            className={`tab ${tab === "leidos" ? "activa" : ""}`}
-            onClick={() => setTab("leidos")}
-          >
-            Leídos
-          </button>
-        </div>
-        <div className="prompts">
-          <button className="prompt" onClick={() => {}}>Cambiar parámetros de IA</button>
-        </div>
-      </header>
-
-      <section className="tabla-wrap">
-        {loading ? (
-          <div className="cargando-container">
-            <div className="cargando">
-              Cargando mensajes<span className="spinner"></span>
+    <main className="bandeja-page">
+      <div className="bandeja-card">
+        {/* Topbar */}
+        <header className="bandeja-header">
+          <div className="bandeja-title">
+            <div className="bandeja-icon">
+              <span role="img" aria-label="Inbox">
+                📬
+              </span>
+            </div>
+            <div>
+              <h2>Bandeja</h2>
+              <p>Revisa y organiza tus correos</p>
             </div>
           </div>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Remitente</th>
-                <th>Asunto</th>
-                <th>Mensaje</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map((c) => (
-                <tr key={c.id} style={{ cursor: "pointer" }}>
-                  <td onClick={() => handleAbrirCorreo(c)}>{c.date}</td>
-                  <td onClick={() => handleAbrirCorreo(c)}>{c.from_name}</td>
-                  <td onClick={() => handleAbrirCorreo(c)}>{c.subject}</td>
-                  <td className="msg" onClick={() => handleAbrirCorreo(c)}>{c.snippet}</td>
-                  <td>
-                    <button
-                      className="btn-menu"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCorreoAEliminar(c); // ✅ Abre modal en lugar de confirmar directo
-                      }}
-                    >
-                      ⋮
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {lista.length === 0 && (
+
+          <div className="bandeja-search-wrap">
+            <input
+              className="bandeja-search"
+              placeholder="Buscar correos por remitente, asunto o contenido..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+
+          <div className="bandeja-user">
+            <span className="bandeja-user-name">{nombreUsuario}</span>
+            <button onClick={cerrarSesion} className="btn-logout">
+              Cerrar sesión
+            </button>
+          </div>
+        </header>
+
+        {/* Tabs y acciones */}
+        <div className="bandeja-controls">
+          <div className="tabs">
+            <button
+              className={`tab ${tab === "no-leidos" ? "activa" : ""}`}
+              onClick={() => setTab("no-leidos")}
+            >
+              No leídos
+            </button>
+            <button
+              className={`tab ${tab === "leidos" ? "activa" : ""}`}
+              onClick={() => setTab("leidos")}
+            >
+              Leídos
+            </button>
+          </div>
+
+          <button className="btn-ia" onClick={() => {}}>
+            Cambiar parámetros de IA
+          </button>
+        </div>
+
+        {/* Tabla */}
+        <section className="tabla-wrap">
+          {loading ? (
+            <div className="cargando-container">
+              <div className="cargando">
+                Cargando mensajes
+                <span className="spinner"></span>
+              </div>
+            </div>
+          ) : (
+            <table className="tabla">
+              <thead>
                 <tr>
-                  <td colSpan="5" className="vacio">Sin resultados</td>
+                  <th>Fecha</th>
+                  <th>Remitente</th>
+                  <th>Asunto</th>
+                  <th>Mensaje</th>
+                  <th></th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </section>
+              </thead>
+              <tbody>
+                {lista.map((c) => (
+                  <tr
+                    key={c.id}
+                    className={c.leido ? "fila leido" : "fila no-leido"}
+                  >
+                    <td onClick={() => handleAbrirCorreo(c)}>{c.date}</td>
+                    <td onClick={() => handleAbrirCorreo(c)}>{c.from_name}</td>
+                    <td onClick={() => handleAbrirCorreo(c)}>{c.subject}</td>
+                    <td
+                      className="msg"
+                      onClick={() => handleAbrirCorreo(c)}
+                    >
+                      {c.snippet}
+                    </td>
+                    <td className="col-acciones">
+                      <button
+                        className="btn-menu"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCorreoAEliminar(c);
+                        }}
+                        title="Eliminar correo"
+                      >
+                        ⋮
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {lista.length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="vacio">
+                      Sin resultados
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </section>
+      </div>
+
+      {/* Modal eliminar */}
       {correoAEliminar && (
         <div className="modal-overlay">
           <div className="modal">
-            <p>¿Eliminar el correo de <strong>{correoAEliminar.from_name}</strong>?</p>
+            <p>
+              ¿Eliminar el correo de{" "}
+              <strong>{correoAEliminar.from_name}</strong>?
+            </p>
             <p className="modal-subject">{correoAEliminar.subject}</p>
             <div className="modal-actions">
               <button
@@ -170,10 +220,7 @@ export default function Bandeja() {
               >
                 Cancelar
               </button>
-              <button
-                className="btn-confirm"
-                onClick={handleEliminarConfirmado}
-              >
+              <button className="btn-confirm" onClick={handleEliminarConfirmado}>
                 Eliminar
               </button>
             </div>

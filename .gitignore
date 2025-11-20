@@ -8,3 +8,14 @@ dist/
 
 
 
+# ---- Archivos sensibles ----
+credentials.json
+*.txt
+
+# ---- Back-end ----
+backend/credentials.json
+backend/*.txt
+
+# ---- Front-end ----
+frontend/credentials.json
+frontend/*.txt
