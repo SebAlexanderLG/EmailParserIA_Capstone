@@ -24,7 +24,7 @@ export default function Bandeja() {
 
   const navegar = useNavigate();
 
-  // ⚡ Función para refrescar correos sin recargar página
+  // Función para refrescar correos sin recargar página
   const refrescarCorreos = async () => {
     try {
       setLoading(true);
@@ -156,7 +156,7 @@ export default function Bandeja() {
               className={`tab ${tab === "no-leidos" ? "activa" : ""}`}
               onClick={async () => {
                 setTab("no-leidos");
-                await refrescarCorreos(); // 🔄 refresca al presionar
+                await refrescarCorreos(); // 
               }}
             >
               No leídos

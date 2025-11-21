@@ -361,11 +361,11 @@
   padding: 32px;
 }
 
-/* === Estilo del textarea del modal de IA === */
+/* Estilo del textarea del modal de IA */
 .prompt-textarea {
   width: 100%;
-  height: 180px;      /* tamaño fijo */
-  resize: none;       /* evita agrandar y mover el modal */
+  height: 180px;      
+  resize: none;       
   padding: 12px;
   border-radius: 12px;
   border: 1px solid #d1d5db;
