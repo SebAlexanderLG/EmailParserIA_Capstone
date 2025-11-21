@@ -24,6 +24,19 @@ export default function Bandeja() {
 
   const navegar = useNavigate();
 
+  // ⚡ Función para refrescar correos sin recargar página
+  const refrescarCorreos = async () => {
+    try {
+      setLoading(true);
+      const data = await obtenerCorreos(50, "metadata");
+      setCorreos(data);
+    } catch (err) {
+      console.error("Error recargando correos:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Carga perfil y correos
   useEffect(() => {
     const cargarDatos = async () => {
@@ -95,115 +108,134 @@ export default function Bandeja() {
   // Guarda prompt en BD
   const handleGuardarPrompt = async () => {
     try {
-      // Guarda en localStorage
       localStorage.setItem("prompt_ia", promptIA);
-
-      // Guarda en base de datos
       const res = await guardarPromptIA(promptIA);
-      alert(res.mensaje || "✅ Parámetros de IA actualizados correctamente.");
-
+      alert(res.mensaje || "Parámetros de IA actualizados.");
       setMostrarModalPrompt(false);
     } catch (err) {
       console.error("Error guardando el prompt:", err);
-      alert("❌ No se pudo guardar el prompt en la base de datos.");
+      alert("No se pudo guardar el prompt.");
     }
   };
 
   return (
-    <main className="bandeja">
-      <header className="topbar">
-        <h2>📬 Bandeja</h2>
-        <input
-          className="buscar"
-          placeholder="Buscar correo..."
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <div className="usuario">
-          <span>{nombreUsuario}</span>
-          <button onClick={cerrarSesion} className="btn-cerrar">
-            Cerrar sesión
-          </button>
-        </div>
+    <main className="bandeja-page">
+      <div className="bandeja-card">
 
-        <div className="tabs">
-          <button
-            className={`tab ${tab === "no-leidos" ? "activa" : ""}`}
-            onClick={() => setTab("no-leidos")}
-          >
-            No leídos
-          </button>
-          <button
-            className={`tab ${tab === "leidos" ? "activa" : ""}`}
-            onClick={() => setTab("leidos")}
-          >
-            Leídos
-          </button>
-        </div>
+        {/* Topbar estilizado */}
+        <header className="bandeja-header">
+          <div className="bandeja-title">
+            <div className="bandeja-icon">📬</div>
+            <div>
+              <h2>Bandeja</h2>
+              <p>Revisa y organiza tus correos</p>
+            </div>
+          </div>
 
-        <div className="prompts">
-          <button
-            className="prompt"
-            onClick={() => setMostrarModalPrompt(true)}
-          >
+          <div className="bandeja-search-wrap">
+            <input
+              className="bandeja-search"
+              placeholder="Buscar correos..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+
+          <div className="bandeja-user">
+            <span className="bandeja-user-name">{nombreUsuario}</span>
+            <button onClick={cerrarSesion} className="btn-logout">
+              Cerrar sesión
+            </button>
+          </div>
+        </header>
+
+        {/* Tabs + IA */}
+        <div className="bandeja-controls">
+          <div className="tabs">
+            <button
+              className={`tab ${tab === "no-leidos" ? "activa" : ""}`}
+              onClick={async () => {
+                setTab("no-leidos");
+                await refrescarCorreos(); // 🔄 refresca al presionar
+              }}
+            >
+              No leídos
+            </button>
+
+            <button
+              className={`tab ${tab === "leidos" ? "activa" : ""}`}
+              onClick={() => setTab("leidos")}
+            >
+              Leídos
+            </button>
+          </div>
+
+          <button className="btn-ia" onClick={() => setMostrarModalPrompt(true)}>
             Cambiar parámetros de IA
           </button>
         </div>
-      </header>
 
-      <section className="tabla-wrap">
-        {loading ? (
-          <div className="cargando-container">
-            <div className="cargando">
-              Cargando mensajes<span className="spinner"></span>
+        {/* TABLA */}
+        <section className="tabla-wrap">
+          {loading ? (
+            <div className="cargando-container">
+              <div className="cargando">
+                Cargando mensajes<span className="spinner"></span>
+              </div>
             </div>
-          </div>
-        ) : (
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Remitente</th>
-                <th>Asunto</th>
-                <th>Mensaje</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map((c) => (
-                <tr key={c.id} style={{ cursor: "pointer" }}>
-                  <td onClick={() => handleAbrirCorreo(c)}>{c.date}</td>
-                  <td onClick={() => handleAbrirCorreo(c)}>{c.from_name}</td>
-                  <td onClick={() => handleAbrirCorreo(c)}>{c.subject}</td>
-                  <td className="msg" onClick={() => handleAbrirCorreo(c)}>
-                    {c.snippet}
-                  </td>
-                  <td>
-                    <button
-                      className="btn-menu"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCorreoAEliminar(c);
-                      }}
-                    >
-                      ⋮
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {lista.length === 0 && (
+          ) : (
+            <table className="tabla">
+              <thead>
                 <tr>
-                  <td colSpan="5" className="vacio">
-                    Sin resultados
-                  </td>
+                  <th>Fecha</th>
+                  <th>Remitente</th>
+                  <th>Asunto</th>
+                  <th>Mensaje</th>
+                  <th></th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-      </section>
+              </thead>
 
-      {/* Modal para eliminar un correo */}
+              <tbody>
+                {lista.map((c) => (
+                  <tr
+                    key={c.id}
+                    className={c.leido ? "fila leido" : "fila no-leido"}
+                  >
+                    <td onClick={() => handleAbrirCorreo(c)}>{c.date}</td>
+                    <td onClick={() => handleAbrirCorreo(c)}>{c.from_name}</td>
+                    <td onClick={() => handleAbrirCorreo(c)}>{c.subject}</td>
+                    <td className="msg" onClick={() => handleAbrirCorreo(c)}>
+                      {c.snippet}
+                    </td>
+
+                    <td className="col-acciones">
+                      <button
+                        className="btn-menu"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCorreoAEliminar(c);
+                        }}
+                      >
+                        ⋮
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+
+                {lista.length === 0 && (
+                  <tr>
+                    <td colSpan="5" className="vacio">
+                      Sin resultados
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </section>
+      </div>
+
+      {/* Modal eliminar */}
       {correoAEliminar && (
         <div className="modal-overlay">
           <div className="modal">
@@ -211,6 +243,7 @@ export default function Bandeja() {
               ¿Eliminar el correo de <strong>{correoAEliminar.from_name}</strong>?
             </p>
             <p className="modal-subject">{correoAEliminar.subject}</p>
+
             <div className="modal-actions">
               <button
                 className="btn-cancel"
@@ -226,17 +259,19 @@ export default function Bandeja() {
         </div>
       )}
 
-      {/* Modal para cambiar el prompt */}
+      {/* Modal IA */}
       {mostrarModalPrompt && (
         <div className="modal-overlay">
           <div className="modal">
             <h3>🧠 Parámetros de IA</h3>
-            <p>Define cómo deseas que la IA redacte las respuestas:</p>
+            <p>Define cómo deseas que la IA redacte tus respuestas:</p>
+
             <textarea
               className="prompt-textarea"
               value={promptIA}
               onChange={(e) => setPromptIA(e.target.value)}
             />
+
             <div className="modal-actions">
               <button
                 className="btn-cancel"
@@ -244,6 +279,7 @@ export default function Bandeja() {
               >
                 Cancelar
               </button>
+
               <button className="btn-confirm" onClick={handleGuardarPrompt}>
                 Guardar
               </button>
