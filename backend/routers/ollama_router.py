@@ -1,10 +1,12 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi import Body
-from services.ollama_service import probar_conexion_ollama, generar_respuesta_ollama
+from services.ollama_service import (
+    probar_conexion_ollama,
+    generar_respuesta_ollama,
+    guardar_prompt_usuario,
+)
 from services.gmail_service import correo_completo
-from fastapi import APIRouter, Request, HTTPException, Body
 from app.database import SessionLocal
-from services.ollama_service import guardar_prompt_usuario
 
 router = APIRouter(prefix="/ollama", tags=["Ollama"])
 

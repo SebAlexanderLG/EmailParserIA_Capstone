@@ -1,7 +1,7 @@
-import requests
 from datetime import datetime, timezone
-from core.config import PROMPT, TIMEOUT, OLLAMA_URL, OLLAMA_URL_TEST
+import requests
 from sqlalchemy.orm import Session
+from core.config import TIMEOUT, OLLAMA_URL, OLLAMA_URL_TEST
 from models.prompt import Prompt
 from models.usuario import Usuario
 

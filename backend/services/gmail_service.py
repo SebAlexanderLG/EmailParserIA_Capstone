@@ -1,15 +1,15 @@
 from email.utils import parsedate_to_datetime
-from bs4 import BeautifulSoup
-from sqlalchemy.orm import Session
+from email.mime.text import MIMEText
 from datetime import datetime
 import re
-from email.mime.text import MIMEText
-from models.email import Email
 import base64
-from models.remitente import Remitente
-from models.usuario import Usuario
+from sqlalchemy.orm import Session
+from bs4 import BeautifulSoup
 from fastapi.responses import RedirectResponse
 from googleapiclient.discovery import build
+from models.email import Email
+from models.remitente import Remitente
+from models.usuario import Usuario
 from utils.correos import manejo_credenciales
 from utils import (
     extraer_encabezados,
@@ -53,29 +53,35 @@ def obtener_correos_preview(
     limit: int = 20,
     format_type: str = "metadata",
     headers: list | None = None,
-) -> list:
-    """Retorna un preview de cada correo (como la lista de gmail)."""
+    page_token: str | None = None,
+) -> dict:
+    """Retorna correos paginados usando Gmail API (nextPageToken real)."""
+
     if headers is None:
         headers = ["From", "Subject", "Date"]
 
     creds = manejo_credenciales(email)
-
     service = build("gmail", "v1", credentials=creds)
 
-    results = (
-        service.users()
-        .messages()
-        .list(
-            userId="me",
-            labelIds=["INBOX"],
-            maxResults=limit,
-        )
-        .execute()
-    )
+    params = {
+        "userId": "me",
+        "labelIds": ["INBOX"],
+        "maxResults": limit,
+    }
+
+    # Si viene un token → pedir la página siguiente
+    if page_token:
+        params["pageToken"] = page_token
+
+    # Ejecutar petición
+    results = service.users().messages().list(**params).execute()
+
     messages = results.get("messages", [])
+    next_page_token = results.get("nextPageToken")
 
     correos = []
     seen_ids = set()
+
     for msg in messages:
         if msg["id"] in seen_ids:
             continue
@@ -84,45 +90,53 @@ def obtener_correos_preview(
         correo = (
             service.users()
             .messages()
-            .get(userId="me", id=msg["id"], format=format_type, metadataHeaders=headers)
+            .get(
+                userId="me",
+                id=msg["id"],
+                format=format_type,
+                metadataHeaders=headers,
+            )
             .execute()
         )
 
-        if format_type == "metadata":
-            correo_simplificado = {}
+        correo_simplificado = {}
 
-            for h in headers:
-                valor = next(
-                    (
-                        item["value"]
-                        for item in correo["payload"]["headers"]
-                        if item["name"] == h
-                    ),
-                    "",
-                )
-                correo_simplificado[h.lower()] = valor
+        for h in headers:
+            valor = next(
+                (
+                    item["value"]
+                    for item in correo.get("payload", {}).get("headers", [])
+                    if item["name"] == h
+                ),
+                "",
+            )
+            correo_simplificado[h.lower()] = valor
 
-            if "date" in correo_simplificado and correo_simplificado["date"]:
-                try:
-                    dt = parsedate_to_datetime(correo_simplificado["date"])
-                    correo_simplificado["date"] = dt.strftime("%d/%m/%Y %H:%M")
-                except ImportError:
-                    pass
-            if "from" in correo_simplificado and "<" in correo_simplificado["from"]:
-                nombre, mail = correo_simplificado["from"].split("<")
-                correo_simplificado["from_name"] = nombre.strip()
-            else:
-                correo_simplificado["from_name"] = correo_simplificado.get("from", "")
-            correo_simplificado["snippet"] = correo.get("snippet", "")
-            correo_simplificado["id"] = msg["id"]
+        # Procesar fecha
+        if correo_simplificado.get("date"):
+            try:
+                dt = parsedate_to_datetime(correo_simplificado["date"])
+                correo_simplificado["date"] = dt.strftime("%d/%m/%Y %H:%M")
+            except Exception as e:
+                pass
 
-            labels = correo.get("labelIds", [])
-            correo_simplificado["leido"] = "UNREAD" not in labels
-
-            correos.append(correo_simplificado)
+        # From → name
+        from_value = correo_simplificado.get("from", "")
+        if "<" in from_value:
+            nombre, _ = from_value.split("<")
+            correo_simplificado["from_name"] = nombre.strip()
         else:
-            correos.append(correo)
-    return correos
+            correo_simplificado["from_name"] = from_value
+
+        correo_simplificado["snippet"] = correo.get("snippet", "")
+        correo_simplificado["id"] = msg["id"]
+
+        labels = correo.get("labelIds", [])
+        correo_simplificado["leido"] = "UNREAD" not in labels
+
+        correos.append(correo_simplificado)
+
+    return {"correos": correos, "nextPageToken": next_page_token}
 
 
 def registrar_correo_en_bd(
@@ -242,11 +256,24 @@ def correo_completo(email: str, mensaje_id: str) -> dict:
 
 
 def marcar_correo_leido(email: str, mensaje_id: str):
-    """Función que marca un correo como leído (quita la etiqueta UNREAD)"""
+    """Función que marca correos como leido"""
     creds = manejo_credenciales(email)
     service = build("gmail", "v1", credentials=creds)
+
     service.users().messages().modify(
         userId="me", id=mensaje_id, body={"removeLabelIds": ["UNREAD"]}
+    ).execute()
+
+    return {"ok": True, "mensaje_id": mensaje_id}
+
+
+def marcar_correo_no_leido(email: str, mensaje_id: str):
+    """Función que marca correos como leido"""
+    creds = manejo_credenciales(email)
+    service = build("gmail", "v1", credentials=creds)
+
+    service.users().messages().modify(
+        userId="me", id=mensaje_id, body={"addLabelIds": ["UNREAD"]}
     ).execute()
 
     return {"ok": True, "mensaje_id": mensaje_id}
@@ -267,7 +294,7 @@ def enviar_respuesta_correo(email_usuario: str, mensaje_id: str, cuerpo_respuest
         creds = manejo_credenciales(email_usuario)
         service = build("gmail", "v1", credentials=creds)
 
-        # 🔹 Obtener el correo original (solo metadata)
+        # Obtiene el correo original (solo metadata)
         mensaje_original = (
             service.users()
             .messages()
@@ -287,24 +314,24 @@ def enviar_respuesta_correo(email_usuario: str, mensaje_id: str, cuerpo_respuest
         if not remitente_raw:
             raise ValueError("No se encontró el remitente del correo original.")
 
-        # ✅ Limpiar y extraer solo el correo electrónico
+        # Limpia y extrae solo el correo electrónico
         match = re.search(r"<(.+?)>", remitente_raw)
         remitente = match.group(1) if match else remitente_raw.strip()
 
-        # 🔹 Crear mensaje MIME (UTF-8)
+        # Crear mensaje MIME (UTF-8)
         mensaje = MIMEText(cuerpo_respuesta, "plain", "utf-8")
         mensaje["to"] = remitente
         mensaje["subject"] = f"Re: {subject}"
 
-        # 🔹 Mantener el hilo original (si tiene Message-ID)
+        # Mantener el hilo original (si tiene Message-ID)
         if message_id_header:
             mensaje["In-Reply-To"] = message_id_header
             mensaje["References"] = message_id_header
 
-        # 🔹 Codificar mensaje (Base64 URL-safe)
+        # Codifica mensaje (Base64 URL-safe)
         raw = base64.urlsafe_b64encode(mensaje.as_bytes()).decode("utf-8")
 
-        # 🔹 Enviar el correo
+        # Envia el correo
         service.users().messages().send(userId="me", body={"raw": raw}).execute()
 
         print(f"[INFO] ✅ Respuesta enviada correctamente a {remitente}")

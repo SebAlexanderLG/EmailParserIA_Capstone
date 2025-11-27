@@ -10,6 +10,7 @@ from services.gmail_service import (
     obtener_correos_preview,
     correo_completo,
     marcar_correo_leido,
+    marcar_correo_no_leido,
     eliminar_correo,
     registrar_correo_en_bd,
     enviar_respuesta_correo,
@@ -31,38 +32,63 @@ def perfil_gmail(request: Request):
 
 @router.post("/correosPreview")
 def correos_preview(request: Request, body: dict = Body(...)):
-    """Endpoint que trae una cantidad de correos en vista previa"""
+    """Endpoint que trae correos en vista previa con paginación real."""
+
     email = request.cookies.get("email")
     print("Email autenticado:", email)
+
     if not email:
         raise HTTPException(status_code=401, detail="No autenticado")
+
     limit = body.get("limit", 20)
     formato = body.get("formato", "metadata")
-    return obtener_correos_preview(email, limit, formato)
+    page_token = body.get("page_token")
+
+    return obtener_correos_preview(
+        email=email,
+        limit=limit,
+        format_type=formato,
+        page_token=page_token,
+    )
 
 
 @router.get("/correos")
 def correos(mensaje_id: str, request: Request):
-    """Endpoint que trae correo completo"""
+    """Endpoint que trae correo completo + respuesta IA (si existe en BD)"""
     email = request.cookies.get("email")
     if not email:
         raise HTTPException(status_code=401, detail="No se encontró el email")
 
-    # ✅ Obtener el correo desde Gmail API
+    # Obtiene el correo desde Gmail API (from, subject, body, etc.)
     correo = correo_completo(email=email, mensaje_id=mensaje_id)
 
-    # ✅ Guardar en BD solo si es la primera vez que se abre
     db = SessionLocal()
+    respuesta_ia = None
+    fecha_envio_str = None
+
     try:
+        # Registra en BD si no existe
         registrar_correo_en_bd(email, correo, mensaje_id, db)
+
+        # Busca el registro del correo en la BD
+        email_db = db.query(Email).filter(Email.email_id == mensaje_id).first()
+        if email_db:
+            respuesta_ia = email_db.respuesta_ia
+            if email_db.fecha_envio:
+                fecha_envio_str = email_db.fecha_envio.strftime("%Y-%m-%d %H:%M:%S")
+
         db.commit()
-    except ImportError as e:
-        print(f"[WARN] No se pudo registrar el correo {mensaje_id}: {e}")
+    except Exception as e:
+        print(f"[WARN] No se pudo registrar/leer correo {mensaje_id}: {e}")
         db.rollback()
     finally:
         db.close()
 
-    return correo
+    return {
+        **correo,
+        "respuesta_ia": respuesta_ia,
+        "fecha_envio": fecha_envio_str,
+    }
 
 
 @router.get("/descargar_adjunto")
@@ -84,16 +110,22 @@ def descargar_adjunto_correo(
 
 @router.post("/marcar_leido")
 def marcar_leido(request: Request, body: dict = Body(...)):
-    """Endpoint que permite marcar un correo como leido"""
     email = request.cookies.get("email")
     if not email:
         raise HTTPException(status_code=401, detail="No autenticado")
+
     mensaje_id = body.get("mensaje_id")
-    if not mensaje_id:
-        raise HTTPException(
-            status_code=400, detail="Faltan parametros para la solicitud."
-        )
-    return marcar_correo_leido(email=email, mensaje_id=mensaje_id)
+    return marcar_correo_leido(email, mensaje_id)
+
+
+@router.post("/marcar_no_leido")
+def marcar_no_leido(request: Request, body: dict = Body(...)):
+    email = request.cookies.get("email")
+    if not email:
+        raise HTTPException(status_code=401, detail="No autenticado")
+
+    mensaje_id = body.get("mensaje_id")
+    return marcar_correo_no_leido(email, mensaje_id)
 
 
 @router.delete("/eliminar_correo")
