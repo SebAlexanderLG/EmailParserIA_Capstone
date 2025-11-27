@@ -50,12 +50,6 @@ export default function Inicio() {
             <img src={logoGmail} alt="Gmail" className="logoGmail" />
           </button>
 
-          <button
-            className="btn secundario"
-            onClick={() => navegar('/bandeja')}
-          >
-            Entrar al sitio
-          </button>
         </div>
       </div>
     </main>

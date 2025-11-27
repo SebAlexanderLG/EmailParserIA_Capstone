@@ -31,18 +31,26 @@ export default function DetalleCorreo() {
     el.style.height = el.scrollHeight + "px";
   };
 
-  // Cargar el correo al abrir la página
+  // Cargar el correo al abrir la página (Gmail + BD)
   useEffect(() => {
     setLoading(true);
     setError("");
 
     obtenerCorreoCompleto(id)
-      .then((data) => setCorreo(data))
+      .then((data) => {
+        setCorreo(data);
+
+        // Si en la BD ya hay una respuesta IA, la dejamos lista
+        if (data.respuesta_ia) {
+          // No la ponemos de inmediato en edición, solo la tenemos disponible
+          // Si quisieras que aparezca editable al tiro, usa: setRespuestaIA(data.respuesta_ia);
+        }
+      })
       .catch(() => setError("No se pudo cargar el correo."))
       .finally(() => setLoading(false));
   }, [id]);
 
-  // Regenerar ajuste al recibir una respuesta nueva
+  // Ajustar altura del textarea cuando cambia la respuesta
   useEffect(() => {
     autoResize();
   }, [respuestaIA]);
@@ -107,19 +115,32 @@ export default function DetalleCorreo() {
       </main>
     );
 
+  if (!correo)
+    return (
+      <main className="detalle">
+        <p className="error">{error || "Correo no encontrado."}</p>
+      </main>
+    );
+
   return (
     <main className="detalle">
       <div className="box">
         <h2>{correo.subject}</h2>
 
-        <p><b>Fecha:</b> {correo.date}</p>
-        <p><b>Remitente:</b> {correo.from}</p>
+        <p>
+          <b>Fecha:</b> {correo.date}
+        </p>
+        <p>
+          <b>Remitente:</b> {correo.from}
+        </p>
 
         {/* CUERPO DEL MENSAJE SIN SCROLL */}
         {correo.body_text ? (
           <div className="mensaje mensaje-texto">{correo.body_text}</div>
         ) : (
-          <div className="mensaje mensaje-html">{parse(correo.body_html)}</div>
+          <div className="mensaje mensaje-html">
+            {correo.body_html ? parse(correo.body_html) : null}
+          </div>
         )}
 
         {correo.attachments?.length > 0 && (
@@ -144,8 +165,36 @@ export default function DetalleCorreo() {
 
         <hr />
 
-        {/* Si aún no se generó la IA */}
-        {!respuestaIA && !loadingIA && (
+        {/* CASO 1: Ya hay respuesta IA guardada en la BD y no estoy editando nada */}
+        {!loadingIA && correo.respuesta_ia && !respuestaIA && (
+          <div className="respuesta-ia-box">
+            <h3>Respuesta enviada anteriormente:</h3>
+
+            <div className="respuesta-guardada">{correo.respuesta_ia}</div>
+
+            {correo.fecha_envio && (
+              <p className="fecha-envio">
+                Enviada el <b>{correo.fecha_envio}</b>
+              </p>
+            )}
+
+            <div className="acciones">
+              <button
+                className="btn-secundario"
+                onClick={() => setRespuestaIA(correo.respuesta_ia)}
+              >
+                Reutilizar / Editar respuesta
+              </button>
+
+              <button className="btn" onClick={() => navegar("/bandeja")}>
+                Volver
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* CASO 2: No hay respuesta guardada y no estoy editando → mostrar botones normales */}
+        {!respuestaIA && !loadingIA && !correo.respuesta_ia && (
           <div className="acciones">
             <button className="btn" onClick={() => navegar("/bandeja")}>
               Volver
@@ -164,7 +213,7 @@ export default function DetalleCorreo() {
           </div>
         )}
 
-        {/* AREA DE EDICIÓN SIN SCROLL + AUTO-RESIZE */}
+        {/* CASO 3: Estoy editando una respuesta (generada o reutilizada) */}
         {respuestaIA && !loadingIA && (
           <div className="respuesta-ia-box">
             <h3>Respuesta generada por IA:</h3>

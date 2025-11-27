@@ -4,20 +4,35 @@ const API_URL = import.meta.env.VITE_API_URL;
 export const obtenerPerfil = async () => {
   const response = await fetch(`${API_URL}/gmail/perfil_gmail`, {
     method: "GET",
-    credentials: "include", // 👈 esto envía la cookie al backend
+    credentials: "include", // esto envía la cookie al backend
   });
   return response.json();
 };
 
 /* Función para obtener los correos en vista previa */
-export const obtenerCorreos = async (limit = 10, formato = "metadata") => {
+export const obtenerCorreos = async (
+  limit = 20,
+  formato = "metadata",
+  pageToken = null
+) => {
   const response = await fetch(`${API_URL}/gmail/correosPreview`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    credentials: "include", //
-    body: JSON.stringify({ limit, formato }),
+    credentials: "include",
+    body: JSON.stringify({
+      limit,
+      formato,
+      page_token: pageToken, // CLAVE: ahora sí enviamos el token
+    }),
   });
-  return response.json();
+
+  const data = await response.json();
+
+  // Esta línea asegura que SIEMPRE devolvemos lo que espera Bandeja.jsx
+  return {
+    correos: data.correos || data || [],
+    nextPageToken: data.nextPageToken || null,
+  };
 };
 
 /* Función que llama al endpoint de cerrar sesión */
@@ -59,7 +74,7 @@ export async function descargarAdjunto(mensajeId, attachmentId, filename) {
     throw new Error(`Error al descargar adjunto: ${errText}`);
   }
 
-  // ✅ Crear descarga directa
+  // Crear descarga directa
   const blob = await response.blob();
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
@@ -80,11 +95,27 @@ export async function marcarComoLeido(mensajeId) {
   });
 
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Error al marcar como leído: ${errText}`);
+    const err = await res.text();
+    throw new Error(err);
   }
 
-  return await res.json();
+  return res.json();
+}
+
+export async function marcarComoNoLeido(mensajeId) {
+  const res = await fetch(`${API_URL}/gmail/marcar_no_leido`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ mensaje_id: mensajeId }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+
+  return res.json();
 }
 
 /* Función para eliminar correos */

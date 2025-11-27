@@ -4,10 +4,13 @@ import {
   obtenerPerfil,
   obtenerCorreos,
   marcarComoLeido,
+  marcarComoNoLeido, 
   eliminarCorreo,
 } from "../api/gmail";
 import { guardarPromptIA } from "../api/prompt";
 import "./Bandeja.css";
+
+const CORREOS_POR_PAGINA = 20;
 
 export default function Bandeja() {
   const [tab, setTab] = useState("no-leidos");
@@ -15,6 +18,10 @@ export default function Bandeja() {
   const [correos, setCorreos] = useState([]);
   const [nombreUsuario, setNombreUsuario] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // PAGINACIÓN LOCAL
+  const [pagina, setPagina] = useState(1);
+
   const [correoAEliminar, setCorreoAEliminar] = useState(null);
   const [mostrarModalPrompt, setMostrarModalPrompt] = useState(false);
   const [promptIA, setPromptIA] = useState(
@@ -24,20 +31,7 @@ export default function Bandeja() {
 
   const navegar = useNavigate();
 
-  // Función para refrescar correos sin recargar página
-  const refrescarCorreos = async () => {
-    try {
-      setLoading(true);
-      const data = await obtenerCorreos(50, "metadata");
-      setCorreos(data);
-    } catch (err) {
-      console.error("Error recargando correos:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Carga perfil y correos
+  // CARGA INICIAL
   useEffect(() => {
     const cargarDatos = async () => {
       try {
@@ -49,8 +43,13 @@ export default function Bandeja() {
         setNombreUsuario(perfil.nombre_real);
 
         setLoading(true);
-        const correosData = await obtenerCorreos(50, "metadata");
-        setCorreos(correosData);
+        const data = await obtenerCorreos(50, "metadata");
+
+        const listaCorreos = Array.isArray(data)
+          ? data
+          : (data.correos || []);
+
+        setCorreos(listaCorreos);
       } catch (err) {
         console.error("Error cargando datos:", err);
         navegar("/");
@@ -62,11 +61,17 @@ export default function Bandeja() {
     cargarDatos();
   }, [navegar]);
 
-  // Filtra correos por "Leidos" y "No Leidos"
-  const lista = useMemo(() => {
+  // Reset paginación al cambiar tab o filtro
+  useEffect(() => {
+    setPagina(1);
+  }, [tab, q]);
+
+  // FILTRAR
+  const listaFiltrada = useMemo(() => {
     const base = correos.filter((c) => (tab === "leidos" ? c.leido : !c.leido));
     const term = q.trim().toLowerCase();
     if (!term) return base;
+
     return base.filter((c) =>
       (c.from_name + " " + c.subject + " " + c.snippet)
         .toLowerCase()
@@ -74,9 +79,30 @@ export default function Bandeja() {
     );
   }, [tab, q, correos]);
 
-  // Permite abrir un correo
+  // PAGINAR
+  const totalPaginas = Math.max(
+    1,
+    Math.ceil(listaFiltrada.length / CORREOS_POR_PAGINA)
+  );
+
+  const indiceInicio = (pagina - 1) * CORREOS_POR_PAGINA;
+  const listaPaginada = listaFiltrada.slice(
+    indiceInicio,
+    indiceInicio + CORREOS_POR_PAGINA
+  );
+
+  const paginaAnterior = () => {
+    if (pagina > 1) setPagina(pagina - 1);
+  };
+
+  const paginaSiguiente = () => {
+    if (pagina < totalPaginas) setPagina(pagina + 1);
+  };
+
+  // ABRIR CORREO
   const handleAbrirCorreo = async (c) => {
     navegar(`/correo/${c.id}`);
+
     if (!c.leido) {
       try {
         await marcarComoLeido(c.id);
@@ -90,7 +116,26 @@ export default function Bandeja() {
     }
   };
 
-  // Confirma eliminación de correo
+const toggleLeido = async (c) => {
+  try {
+    if (c.leido) {
+      await marcarComoNoLeido(c.id);
+    } else {
+      await marcarComoLeido(c.id);
+    }
+
+    setCorreos((prev) =>
+      prev.map((x) =>
+        x.id === c.id ? { ...x, leido: !c.leido } : x
+      )
+    );
+  } catch (err) {
+    console.error("Error cambiando estado:", err);
+    alert("No se pudo cambiar el estado del correo.");
+  }
+};
+
+  // ELIMINAR
   const handleEliminarConfirmado = async () => {
     if (!correoAEliminar) return;
     try {
@@ -98,14 +143,13 @@ export default function Bandeja() {
       setCorreos((prev) => prev.filter((c) => c.id !== correoAEliminar.id));
       setCorreoAEliminar(null);
     } catch (err) {
-      console.error("Error eliminando correo:", err);
       alert("No se pudo eliminar el correo.");
     }
   };
 
   const cerrarSesion = () => navegar("/");
 
-  // Guarda prompt en BD
+  // IA
   const handleGuardarPrompt = async () => {
     try {
       localStorage.setItem("prompt_ia", promptIA);
@@ -113,7 +157,6 @@ export default function Bandeja() {
       alert(res.mensaje || "Parámetros de IA actualizados.");
       setMostrarModalPrompt(false);
     } catch (err) {
-      console.error("Error guardando el prompt:", err);
       alert("No se pudo guardar el prompt.");
     }
   };
@@ -122,7 +165,7 @@ export default function Bandeja() {
     <main className="bandeja-page">
       <div className="bandeja-card">
 
-        {/* Topbar estilizado */}
+        {/* HEADER */}
         <header className="bandeja-header">
           <div className="bandeja-title">
             <div className="bandeja-icon">📬</div>
@@ -149,15 +192,12 @@ export default function Bandeja() {
           </div>
         </header>
 
-        {/* Tabs + IA */}
+        {/* CONTROLES */}
         <div className="bandeja-controls">
           <div className="tabs">
             <button
               className={`tab ${tab === "no-leidos" ? "activa" : ""}`}
-              onClick={async () => {
-                setTab("no-leidos");
-                await refrescarCorreos(); // 
-              }}
+              onClick={() => setTab("no-leidos")}
             >
               No leídos
             </button>
@@ -191,16 +231,13 @@ export default function Bandeja() {
                   <th>Remitente</th>
                   <th>Asunto</th>
                   <th>Mensaje</th>
-                  <th></th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
 
               <tbody>
-                {lista.map((c) => (
-                  <tr
-                    key={c.id}
-                    className={c.leido ? "fila leido" : "fila no-leido"}
-                  >
+                {listaPaginada.map((c) => (
+                  <tr key={c.id} className={c.leido ? "fila leido" : "fila no-leido"}>
                     <td onClick={() => handleAbrirCorreo(c)}>{c.date}</td>
                     <td onClick={() => handleAbrirCorreo(c)}>{c.from_name}</td>
                     <td onClick={() => handleAbrirCorreo(c)}>{c.subject}</td>
@@ -208,21 +245,34 @@ export default function Bandeja() {
                       {c.snippet}
                     </td>
 
-                    <td className="col-acciones">
-                      <button
-                        className="btn-menu"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCorreoAEliminar(c);
-                        }}
-                      >
-                        ⋮
-                      </button>
+                    {/* ACCIONES */}
+                    <td className="col-acciones acciones-inline">
+                      <div className="acciones-wrap">
+                        <button
+                          className="btn-toggle"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleLeido(c);
+                          }}
+                        >
+                          {c.leido ? "↩ No leído" : "✓ Leído"}
+                        </button>
+
+                        <button
+                          className="btn-menu"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCorreoAEliminar(c);
+                          }}
+                        >
+                          ⋮
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
 
-                {lista.length === 0 && (
+                {listaPaginada.length === 0 && (
                   <tr>
                     <td colSpan="5" className="vacio">
                       Sin resultados
@@ -233,9 +283,33 @@ export default function Bandeja() {
             </table>
           )}
         </section>
+
+        {/* PAGINACIÓN */}
+        <div className="paginacion">
+          <button
+            className="btn-pag"
+            disabled={pagina === 1}
+            onClick={paginaAnterior}
+          >
+            ⬅ Anterior
+          </button>
+
+          <span className="info-pagina">
+            Página {pagina} de {totalPaginas}
+          </span>
+
+          <button
+            className="btn-pag"
+            disabled={pagina === totalPaginas}
+            onClick={paginaSiguiente}
+          >
+            Siguiente ➡
+          </button>
+        </div>
+
       </div>
 
-      {/* Modal eliminar */}
+      {/* MODAL ELIMINAR */}
       {correoAEliminar && (
         <div className="modal-overlay">
           <div className="modal">
@@ -251,6 +325,7 @@ export default function Bandeja() {
               >
                 Cancelar
               </button>
+
               <button className="btn-confirm" onClick={handleEliminarConfirmado}>
                 Eliminar
               </button>
@@ -259,7 +334,7 @@ export default function Bandeja() {
         </div>
       )}
 
-      {/* Modal IA */}
+      {/* MODAL IA */}
       {mostrarModalPrompt && (
         <div className="modal-overlay">
           <div className="modal">
