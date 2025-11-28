@@ -9,10 +9,14 @@ import {
 } from "../api/gmail";
 
 import { generarRespuestaOllama } from "../api/ollama";
-import { obtenerPrompt } from "../api/prompt";   // ← AQUI 🔥
+import { obtenerPrompt } from "../api/prompt";
 
 import toast, { Toaster } from "react-hot-toast";
+
 import "./Correo.css";
+
+// CACHE
+import { correosCache } from "../api/correosCache";
 
 export default function DetalleCorreo() {
   const { id } = useParams();
@@ -26,7 +30,7 @@ export default function DetalleCorreo() {
   const [respuestaIA, setRespuestaIA] = useState("");
   const [enviando, setEnviando] = useState(false);
 
-  const [promptUsuarioBD, setPromptUsuarioBD] = useState(""); // ←🔥 NUEVO: prompt REAL desde DB
+  const [promptUsuarioBD, setPromptUsuarioBD] = useState("");
 
   const textareaRef = useRef(null);
 
@@ -37,28 +41,35 @@ export default function DetalleCorreo() {
     el.style.height = el.scrollHeight + "px";
   };
 
-  // CARGA DEL CORREO + PROMPT DEL USUARIO
+  // CARGA CORREO + CACHE
   useEffect(() => {
     const cargarTodo = async () => {
       setLoading(true);
       setError("");
 
       try {
-        // CARGAR CORREO
+        // 1) SI YA ESTÁ EN CACHE → carga inmediata
+        if (correosCache.detalle[id]) {
+          setCorreo(correosCache.detalle[id]);
+          setLoading(false);
+        }
+
+        // 2) Cargar desde backend (refresco)
         const dataCorreo = await obtenerCorreoCompleto(id);
         setCorreo(dataCorreo);
 
-        // CARGAR PROMPT DESDE LA BD
+        // guardar en cache
+        correosCache.detalle[id] = dataCorreo;
+
+        // 3) cargar prompt
         const p = await obtenerPrompt();
-        if (p?.contexto) {
-          setPromptUsuarioBD(p.contexto);
-        } else {
-          // Default SOLO si el usuario no tiene prompt personalizado
-          setPromptUsuarioBD(
+        setPromptUsuarioBD(
+          p?.contexto ||
             "Por favor, redacta una respuesta profesional y cordial al siguiente correo:"
-          );
-        }
+        );
+
       } catch (err) {
+        console.error(err);
         setError("No se pudo cargar el correo.");
       } finally {
         setLoading(false);
@@ -80,7 +91,7 @@ export default function DetalleCorreo() {
     try {
       const data = await generarRespuestaOllama({
         mensaje_id: id,
-        prompt_key: promptUsuarioBD,   // ←🔥 SIEMPRE EL PROMPT DEL USUARIO
+        prompt_key: promptUsuarioBD,
       });
 
       setRespuestaIA(data.respuesta || "Sin respuesta generada por la IA.");
@@ -107,13 +118,14 @@ export default function DetalleCorreo() {
     setEnviando(true);
 
     try {
-      const res = await enviarCorreoRespuesta({
+      await enviarCorreoRespuesta({
         mensaje_id: id,
         respuesta_texto: respuestaIA,
       });
 
-      toast.success(`Correo enviado correctamente`);
+      toast.success("Correo enviado correctamente");
       setRespuestaIA("");
+
       navegar("/bandeja");
     } catch {
       toast.error("Error al enviar el correo");
@@ -122,7 +134,7 @@ export default function DetalleCorreo() {
     }
   };
 
-  // CARGANDO
+  // LOADING
   if (loading)
     return (
       <main className="detalle">
@@ -144,7 +156,6 @@ export default function DetalleCorreo() {
 
   return (
     <main className="detalle">
-
       <Toaster
         position="bottom-right"
         toastOptions={{
@@ -162,8 +173,12 @@ export default function DetalleCorreo() {
       <div className="box">
         <h2>{correo.subject}</h2>
 
-        <p><b>Fecha:</b> {correo.date}</p>
-        <p><b>Remitente:</b> {correo.from}</p>
+        <p>
+          <b>Fecha:</b> {correo.date}
+        </p>
+        <p>
+          <b>Remitente:</b> {correo.from}
+        </p>
 
         {correo.body_text ? (
           <div className="mensaje mensaje-texto">{correo.body_text}</div>
@@ -222,7 +237,7 @@ export default function DetalleCorreo() {
           </div>
         )}
 
-        {/* GENERAR IA */}
+        {/* BOTÓN GENERAR */}
         {!respuestaIA && !loadingIA && !correo.respuesta_ia && (
           <div className="acciones">
             <button className="btn" onClick={() => navegar("/bandeja")}>
@@ -234,7 +249,7 @@ export default function DetalleCorreo() {
           </div>
         )}
 
-        {/* CARGANDO IA */}
+        {/* LOADING IA */}
         {loadingIA && (
           <div className="loading-box">
             <div className="spinner"></div>

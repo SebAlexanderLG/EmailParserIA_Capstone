@@ -15,6 +15,9 @@ import toast, { Toaster } from "react-hot-toast";
 
 import "./Bandeja.css";
 
+// CACHE
+import { correosCache } from "../api/correosCache";
+
 const CORREOS_POR_PAGINA = 20;
 
 export default function Bandeja() {
@@ -31,7 +34,7 @@ export default function Bandeja() {
 
   const navegar = useNavigate();
 
-  // CARGA INICIAL
+  // CARGA INICIAL + CACHE
   useEffect(() => {
     const cargarDatos = async () => {
       try {
@@ -40,19 +43,37 @@ export default function Bandeja() {
           navegar("/");
           return;
         }
+
         setNombreUsuario(perfil.nombre_real);
 
+        // SI YA TENGO CACHE → carga inmediata SIN pedir al backend
+        if (correosCache.lista) {
+          setCorreos(correosCache.lista);
+
+          // igual cargamos el prompt aunque haya cache
+          const promptData = await obtenerPrompt();
+          if (promptData?.contexto) {
+            setPromptIA(promptData.contexto);
+          }
+
+          setLoading(false);
+          return;
+        }
+
+        // NO hay cache → cargar desde API
         setLoading(true);
 
-        // CORREOS DEL API
         const data = await obtenerCorreos(50, "metadata");
         const listaCorreos = Array.isArray(data)
           ? data
           : data.correos || [];
 
+        // Guardar en estado + cache
         setCorreos(listaCorreos);
+        correosCache.lista = listaCorreos;
+        correosCache.timestamp = Date.now();
 
-        // PROMPT PERSONALIZADO
+        // Prompt
         const promptData = await obtenerPrompt();
         if (promptData?.contexto) {
           setPromptIA(promptData.contexto);
@@ -69,7 +90,7 @@ export default function Bandeja() {
     cargarDatos();
   }, [navegar]);
 
-  // Reset de paginación al cambiar filtro
+  // Reset paginación al cambiar filtro
   useEffect(() => {
     setPagina(1);
   }, [tab, q]);
@@ -114,11 +135,14 @@ export default function Bandeja() {
       try {
         await marcarComoLeido(c.id);
 
-        setCorreos((prev) =>
-          prev.map((x) =>
+        // Actualizar estado
+        setCorreos((prev) => {
+          const actualizado = prev.map((x) =>
             x.id === c.id ? { ...x, leido: true } : x
-          )
-        );
+          );
+          correosCache.lista = actualizado; // UPDATE CACHE
+          return actualizado;
+        });
 
         setTab("leidos");
       } catch {
@@ -133,11 +157,13 @@ export default function Bandeja() {
       if (c.leido) await marcarComoNoLeido(c.id);
       else await marcarComoLeido(c.id);
 
-      setCorreos((prev) =>
-        prev.map((x) =>
+      setCorreos((prev) => {
+        const actualizado = prev.map((x) =>
           x.id === c.id ? { ...x, leido: !c.leido } : x
-        )
-      );
+        );
+        correosCache.lista = actualizado; // UPDATE CACHE
+        return actualizado;
+      });
     } catch {
       toast.error("Error cambiando estado del correo");
     }
@@ -150,9 +176,11 @@ export default function Bandeja() {
     try {
       await eliminarCorreo(correoAEliminar.id);
 
-      setCorreos((prev) =>
-        prev.filter((c) => c.id !== correoAEliminar.id)
-      );
+      setCorreos((prev) => {
+        const actualizado = prev.filter((c) => c.id !== correoAEliminar.id);
+        correosCache.lista = actualizado; // UPDATE CACHE
+        return actualizado;
+      });
 
       toast.success("Correo eliminado");
       setCorreoAEliminar(null);
@@ -280,8 +308,6 @@ export default function Bandeja() {
 
                     <td onClick={() => handleAbrirCorreo(c)}>
                       {c.subject}
-
-                      {/* CHECK PROCESADO */}
                       {c.respuesta_ia && (
                         <span className="tag-procesado">✔ Procesado</span>
                       )}
