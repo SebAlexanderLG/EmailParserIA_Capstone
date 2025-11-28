@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
   obtenerPerfil,
   obtenerCorreos,
   marcarComoLeido,
-  marcarComoNoLeido, 
+  marcarComoNoLeido,
   eliminarCorreo,
 } from "../api/gmail";
-import { guardarPromptIA } from "../api/prompt";
+
+import { obtenerPrompt, guardarPromptIA } from "../api/prompt";
+
+import toast, { Toaster } from "react-hot-toast";
+
 import "./Bandeja.css";
 
 const CORREOS_POR_PAGINA = 20;
@@ -18,16 +23,11 @@ export default function Bandeja() {
   const [correos, setCorreos] = useState([]);
   const [nombreUsuario, setNombreUsuario] = useState("");
   const [loading, setLoading] = useState(true);
-
-  // PAGINACIÓN LOCAL
   const [pagina, setPagina] = useState(1);
-
   const [correoAEliminar, setCorreoAEliminar] = useState(null);
+
   const [mostrarModalPrompt, setMostrarModalPrompt] = useState(false);
-  const [promptIA, setPromptIA] = useState(
-    localStorage.getItem("prompt_ia") ||
-      "Por favor, redacta una respuesta profesional y cordial al siguiente correo."
-  );
+  const [promptIA, setPromptIA] = useState("");
 
   const navegar = useNavigate();
 
@@ -43,13 +43,21 @@ export default function Bandeja() {
         setNombreUsuario(perfil.nombre_real);
 
         setLoading(true);
-        const data = await obtenerCorreos(50, "metadata");
 
+        // CORREOS DEL API
+        const data = await obtenerCorreos(50, "metadata");
         const listaCorreos = Array.isArray(data)
           ? data
-          : (data.correos || []);
+          : data.correos || [];
 
         setCorreos(listaCorreos);
+
+        // PROMPT PERSONALIZADO
+        const promptData = await obtenerPrompt();
+        if (promptData?.contexto) {
+          setPromptIA(promptData.contexto);
+        }
+
       } catch (err) {
         console.error("Error cargando datos:", err);
         navegar("/");
@@ -61,14 +69,17 @@ export default function Bandeja() {
     cargarDatos();
   }, [navegar]);
 
-  // Reset paginación al cambiar tab o filtro
+  // Reset de paginación al cambiar filtro
   useEffect(() => {
     setPagina(1);
   }, [tab, q]);
 
-  // FILTRAR
+  // FILTRO
   const listaFiltrada = useMemo(() => {
-    const base = correos.filter((c) => (tab === "leidos" ? c.leido : !c.leido));
+    const base = correos.filter((c) =>
+      tab === "leidos" ? c.leido : !c.leido
+    );
+
     const term = q.trim().toLowerCase();
     if (!term) return base;
 
@@ -79,7 +90,7 @@ export default function Bandeja() {
     );
   }, [tab, q, correos]);
 
-  // PAGINAR
+  // PAGINACIÓN
   const totalPaginas = Math.max(
     1,
     Math.ceil(listaFiltrada.length / CORREOS_POR_PAGINA)
@@ -91,13 +102,9 @@ export default function Bandeja() {
     indiceInicio + CORREOS_POR_PAGINA
   );
 
-  const paginaAnterior = () => {
-    if (pagina > 1) setPagina(pagina - 1);
-  };
-
-  const paginaSiguiente = () => {
-    if (pagina < totalPaginas) setPagina(pagina + 1);
-  };
+  const paginaAnterior = () => pagina > 1 && setPagina(pagina - 1);
+  const paginaSiguiente = () =>
+    pagina < totalPaginas && setPagina(pagina + 1);
 
   // ABRIR CORREO
   const handleAbrirCorreo = async (c) => {
@@ -106,63 +113,85 @@ export default function Bandeja() {
     if (!c.leido) {
       try {
         await marcarComoLeido(c.id);
+
         setCorreos((prev) =>
-          prev.map((x) => (x.id === c.id ? { ...x, leido: true } : x))
+          prev.map((x) =>
+            x.id === c.id ? { ...x, leido: true } : x
+          )
         );
+
         setTab("leidos");
-      } catch (err) {
-        console.error("Error marcando como leído:", err);
+      } catch {
+        toast.error("Error marcando como leído");
       }
     }
   };
 
-const toggleLeido = async (c) => {
-  try {
-    if (c.leido) {
-      await marcarComoNoLeido(c.id);
-    } else {
-      await marcarComoLeido(c.id);
-    }
+  // TOGGLE LEÍDO
+  const toggleLeido = async (c) => {
+    try {
+      if (c.leido) await marcarComoNoLeido(c.id);
+      else await marcarComoLeido(c.id);
 
-    setCorreos((prev) =>
-      prev.map((x) =>
-        x.id === c.id ? { ...x, leido: !c.leido } : x
-      )
-    );
-  } catch (err) {
-    console.error("Error cambiando estado:", err);
-    alert("No se pudo cambiar el estado del correo.");
-  }
-};
+      setCorreos((prev) =>
+        prev.map((x) =>
+          x.id === c.id ? { ...x, leido: !c.leido } : x
+        )
+      );
+    } catch {
+      toast.error("Error cambiando estado del correo");
+    }
+  };
 
   // ELIMINAR
   const handleEliminarConfirmado = async () => {
     if (!correoAEliminar) return;
+
     try {
       await eliminarCorreo(correoAEliminar.id);
-      setCorreos((prev) => prev.filter((c) => c.id !== correoAEliminar.id));
+
+      setCorreos((prev) =>
+        prev.filter((c) => c.id !== correoAEliminar.id)
+      );
+
+      toast.success("Correo eliminado");
       setCorreoAEliminar(null);
-    } catch (err) {
-      alert("No se pudo eliminar el correo.");
+
+    } catch {
+      toast.error("No se pudo eliminar el correo");
     }
   };
 
   const cerrarSesion = () => navegar("/");
 
-  // IA
+  // GUARDAR PROMPT
   const handleGuardarPrompt = async () => {
     try {
-      localStorage.setItem("prompt_ia", promptIA);
       const res = await guardarPromptIA(promptIA);
-      alert(res.mensaje || "Parámetros de IA actualizados.");
+      toast.success(res.mensaje || "Prompt guardado correctamente");
       setMostrarModalPrompt(false);
-    } catch (err) {
-      alert("No se pudo guardar el prompt.");
+    } catch {
+      toast.error("No se pudo guardar el prompt");
     }
   };
 
   return (
     <main className="bandeja-page">
+
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          success: {
+            duration: 2300,
+            style: { background: "#2563eb", color: "white" },
+          },
+          error: {
+            duration: 2600,
+            style: { background: "#dc2626", color: "white" },
+          },
+        }}
+      />
+
       <div className="bandeja-card">
 
         {/* HEADER */}
@@ -175,6 +204,7 @@ const toggleLeido = async (c) => {
             </div>
           </div>
 
+          {/* BUSCADOR */}
           <div className="bandeja-search-wrap">
             <input
               className="bandeja-search"
@@ -184,6 +214,7 @@ const toggleLeido = async (c) => {
             />
           </div>
 
+          {/* USER */}
           <div className="bandeja-user">
             <span className="bandeja-user-name">{nombreUsuario}</span>
             <button onClick={cerrarSesion} className="btn-logout">
@@ -192,7 +223,7 @@ const toggleLeido = async (c) => {
           </div>
         </header>
 
-        {/* CONTROLES */}
+        {/* TABS */}
         <div className="bandeja-controls">
           <div className="tabs">
             <button
@@ -217,10 +248,11 @@ const toggleLeido = async (c) => {
 
         {/* TABLA */}
         <section className="tabla-wrap">
+
           {loading ? (
             <div className="cargando-container">
               <div className="cargando">
-                Cargando mensajes<span className="spinner"></span>
+                Cargando mensajes <span className="spinner"></span>
               </div>
             </div>
           ) : (
@@ -236,16 +268,32 @@ const toggleLeido = async (c) => {
               </thead>
 
               <tbody>
+
                 {listaPaginada.map((c) => (
-                  <tr key={c.id} className={c.leido ? "fila leido" : "fila no-leido"}>
+                  <tr
+                    key={c.id}
+                    className={c.leido ? "fila leido" : "fila no-leido"}
+                  >
                     <td onClick={() => handleAbrirCorreo(c)}>{c.date}</td>
+
                     <td onClick={() => handleAbrirCorreo(c)}>{c.from_name}</td>
-                    <td onClick={() => handleAbrirCorreo(c)}>{c.subject}</td>
-                    <td className="msg" onClick={() => handleAbrirCorreo(c)}>
+
+                    <td onClick={() => handleAbrirCorreo(c)}>
+                      {c.subject}
+
+                      {/* CHECK PROCESADO */}
+                      {c.respuesta_ia && (
+                        <span className="tag-procesado">✔ Procesado</span>
+                      )}
+                    </td>
+
+                    <td
+                      className="msg"
+                      onClick={() => handleAbrirCorreo(c)}
+                    >
                       {c.snippet}
                     </td>
 
-                    {/* ACCIONES */}
                     <td className="col-acciones acciones-inline">
                       <div className="acciones-wrap">
                         <button
@@ -279,9 +327,11 @@ const toggleLeido = async (c) => {
                     </td>
                   </tr>
                 )}
+
               </tbody>
             </table>
           )}
+
         </section>
 
         {/* PAGINACIÓN */}
@@ -306,7 +356,6 @@ const toggleLeido = async (c) => {
             Siguiente ➡
           </button>
         </div>
-
       </div>
 
       {/* MODAL ELIMINAR */}
@@ -314,7 +363,8 @@ const toggleLeido = async (c) => {
         <div className="modal-overlay">
           <div className="modal">
             <p>
-              ¿Eliminar el correo de <strong>{correoAEliminar.from_name}</strong>?
+              ¿Eliminar el correo de{" "}
+              <strong>{correoAEliminar.from_name}</strong>?
             </p>
             <p className="modal-subject">{correoAEliminar.subject}</p>
 
@@ -326,7 +376,10 @@ const toggleLeido = async (c) => {
                 Cancelar
               </button>
 
-              <button className="btn-confirm" onClick={handleEliminarConfirmado}>
+              <button
+                className="btn-confirm"
+                onClick={handleEliminarConfirmado}
+              >
                 Eliminar
               </button>
             </div>
@@ -342,10 +395,28 @@ const toggleLeido = async (c) => {
             <p>Define cómo deseas que la IA redacte tus respuestas:</p>
 
             <textarea
-              className="prompt-textarea"
+              className={`prompt-textarea ${
+                promptIA.length === 600 ? "limite" : ""
+              }`}
               value={promptIA}
-              onChange={(e) => setPromptIA(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value.length <= 600) {
+                  setPromptIA(e.target.value);
+                }
+              }}
             />
+
+            <p
+              className={`prompt-count ${
+                promptIA.length === 600
+                  ? "error"
+                  : promptIA.length > 480
+                  ? "warning"
+                  : ""
+              }`}
+            >
+              {promptIA.length} / 600 caracteres
+            </p>
 
             <div className="modal-actions">
               <button
@@ -362,6 +433,7 @@ const toggleLeido = async (c) => {
           </div>
         </div>
       )}
+
     </main>
   );
 }

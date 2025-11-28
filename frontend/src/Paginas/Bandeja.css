@@ -480,3 +480,31 @@
   gap: 6px;
   justify-content: flex-end;
 }
+
+/* TAG DE CORREO PROCESADO */
+.tag-procesado {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+
+  background: #22c55e20;   /* verde suave transparente */
+  color: #15803d;          /* verde más oscuro */
+  border: 1px solid #15803d40;
+
+  animation: apareceTag .25s ease-out;
+}
+
+/* Animación de entrada */
+@keyframes apareceTag {
+  from {
+    opacity: 0;
+    transform: scale(0.8) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
