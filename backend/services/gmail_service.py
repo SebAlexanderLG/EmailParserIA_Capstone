@@ -11,6 +11,7 @@ from models.email import Email
 from models.remitente import Remitente
 from models.usuario import Usuario
 from utils.correos import manejo_credenciales
+from app.database import SessionLocal
 from utils import (
     extraer_encabezados,
     extraer_asunto,
@@ -55,7 +56,7 @@ def obtener_correos_preview(
     headers: list | None = None,
     page_token: str | None = None,
 ) -> dict:
-    """Retorna correos paginados usando Gmail API (nextPageToken real)."""
+    """Retorna correos paginados usando Gmail API + estados desde la BD."""
 
     if headers is None:
         headers = ["From", "Subject", "Date"]
@@ -69,11 +70,9 @@ def obtener_correos_preview(
         "maxResults": limit,
     }
 
-    # Si viene un token → pedir la página siguiente
     if page_token:
         params["pageToken"] = page_token
 
-    # Ejecutar petición
     results = service.users().messages().list(**params).execute()
 
     messages = results.get("messages", [])
@@ -82,59 +81,79 @@ def obtener_correos_preview(
     correos = []
     seen_ids = set()
 
-    for msg in messages:
-        if msg["id"] in seen_ids:
-            continue
-        seen_ids.add(msg["id"])
+    db = SessionLocal()
 
-        correo = (
-            service.users()
-            .messages()
-            .get(
-                userId="me",
-                id=msg["id"],
-                format=format_type,
-                metadataHeaders=headers,
+    try:
+        for msg in messages:
+            if msg["id"] in seen_ids:
+                continue
+
+            seen_ids.add(msg["id"])
+
+            correo = (
+                service.users()
+                .messages()
+                .get(
+                    userId="me",
+                    id=msg["id"],
+                    format=format_type,
+                    metadataHeaders=headers,
+                )
+                .execute()
             )
-            .execute()
-        )
 
-        correo_simplificado = {}
+            correo_simplificado = {}
 
-        for h in headers:
-            valor = next(
-                (
-                    item["value"]
-                    for item in correo.get("payload", {}).get("headers", [])
-                    if item["name"] == h
-                ),
-                "",
-            )
-            correo_simplificado[h.lower()] = valor
+            for h in headers:
+                valor = next(
+                    (
+                        item["value"]
+                        for item in correo.get("payload", {}).get("headers", [])
+                        if item["name"] == h
+                    ),
+                    "",
+                )
+                correo_simplificado[h.lower()] = valor
 
-        # Procesar fecha
-        if correo_simplificado.get("date"):
-            try:
-                dt = parsedate_to_datetime(correo_simplificado["date"])
-                correo_simplificado["date"] = dt.strftime("%d/%m/%Y %H:%M")
-            except Exception as e:
-                pass
+            # Procesar fecha
+            if correo_simplificado.get("date"):
+                try:
+                    dt = parsedate_to_datetime(correo_simplificado["date"])
+                    correo_simplificado["date"] = dt.strftime("%d/%m/%Y %H:%M")
+                except:
+                    pass
 
-        # From → name
-        from_value = correo_simplificado.get("from", "")
-        if "<" in from_value:
-            nombre, _ = from_value.split("<")
-            correo_simplificado["from_name"] = nombre.strip()
-        else:
-            correo_simplificado["from_name"] = from_value
+            # From name
+            from_value = correo_simplificado.get("from", "")
+            if "<" in from_value:
+                nombre, _ = from_value.split("<")
+                correo_simplificado["from_name"] = nombre.strip()
+            else:
+                correo_simplificado["from_name"] = from_value
 
-        correo_simplificado["snippet"] = correo.get("snippet", "")
-        correo_simplificado["id"] = msg["id"]
+            correo_simplificado["snippet"] = correo.get("snippet", "")
+            correo_simplificado["id"] = msg["id"]
 
-        labels = correo.get("labelIds", [])
-        correo_simplificado["leido"] = "UNREAD" not in labels
+            labels = correo.get("labelIds", [])
+            correo_simplificado["leido"] = "UNREAD" not in labels
 
-        correos.append(correo_simplificado)
+            email_db = db.query(Email).filter(Email.email_id == msg["id"]).first()
+
+            if email_db:
+                correo_simplificado["respuesta_ia"] = email_db.respuesta_ia or ""
+                correo_simplificado["fecha_envio"] = (
+                    email_db.fecha_envio.strftime("%Y-%m-%d %H:%M")
+                    if email_db.fecha_envio
+                    else None
+                )
+            else:
+                correo_simplificado["respuesta_ia"] = ""
+                correo_simplificado["fecha_envio"] = None
+
+            correos.append(correo_simplificado)
+
+    finally:
+        db.close()
 
     return {"correos": correos, "nextPageToken": next_page_token}
 

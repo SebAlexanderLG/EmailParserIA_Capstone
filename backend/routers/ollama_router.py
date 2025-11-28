@@ -7,6 +7,7 @@ from services.ollama_service import (
 )
 from services.gmail_service import correo_completo
 from app.database import SessionLocal
+from models import Usuario, Prompt
 
 router = APIRouter(prefix="/ollama", tags=["Ollama"])
 
@@ -73,5 +74,25 @@ def guardar_prompt(request: Request, body: dict = Body(...)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.get("/obtener_prompt")
+def obtener_prompt(request: Request):
+    """Obtiene el prompt personalizado del usuario autenticado."""
+    email = request.cookies.get("email")
+    if not email:
+        raise HTTPException(status_code=401, detail="No autenticado")
+
+    db = SessionLocal()
+    try:
+        usuario = db.query(Usuario).filter(Usuario.email == email).first()
+        if not usuario:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+        prompt = db.query(Prompt).filter(Prompt.usuario_id == usuario.id).first()
+
+        return {"ok": True, "contexto": prompt.contexto if prompt else None}
     finally:
         db.close()
